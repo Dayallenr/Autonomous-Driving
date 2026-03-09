@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# PyTorch model checkpoints (large binary files — track separately if needed)
+models/cil_model.pt
+# Keep best_perception_model.pt tracked only if you want it in the repo
+# models/best_perception_model.pt
+
+# Collected training data (can be very large)
+data/
+
+# Logs and outputs
+*.log
+runs/
+wandb/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# CARLA temporary files
+carla_logs/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/

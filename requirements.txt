@@ -1,0 +1,27 @@
+# CARLA Python API — install from CARLA release package
+# Download from: https://github.com/carla-simulator/carla/releases/tag/0.9.14
+# Then: pip install <path>/carla-0.9.14-cp3x-cp3x-linux_x86_64.whl
+# carla==0.9.14
+
+# Deep learning
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.4.0
+
+# Numerical / vision
+numpy>=1.24.0
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# Localization (EKF is implemented from scratch with numpy, no filterpy needed)
+
+# GNSS coordinate conversion (implemented inline, no external dep)
+
+# Data collection / training utilities
+tqdm>=4.65.0
+
+# Visualization / HUD
+pygame>=2.5.0
+
+# Configuration
+PyYAML>=6.0
