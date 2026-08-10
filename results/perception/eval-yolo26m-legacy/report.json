@@ -1,0 +1,109 @@
+{
+  "weights": "models/best_perception_model.pt",
+  "dataset": "data/kitti_seqdisjoint.yaml",
+  "map50": 0.96327,
+  "map50_95": 0.79981,
+  "precision": 0.95174,
+  "recall": 0.92046,
+  "images": 1376,
+  "instances": 9079,
+  "device": "mps",
+  "evaluated_at": "2026-08-10T22:13:16.867210+00:00",
+  "per_class": [
+    {
+      "name": "car",
+      "ap50": 0.98637,
+      "ap50_95": 0.86401,
+      "precision": 0.94573,
+      "recall": 0.95783,
+      "instances": 6663,
+      "images": 1376,
+      "drives": 13,
+      "low_confidence": false
+    },
+    {
+      "name": "pedestrian",
+      "ap50": 0.91979,
+      "ap50_95": 0.67548,
+      "precision": 0.93825,
+      "recall": 0.83424,
+      "instances": 917,
+      "images": 293,
+      "drives": 10,
+      "low_confidence": false
+    },
+    {
+      "name": "van",
+      "ap50": 0.98521,
+      "ap50_95": 0.85707,
+      "precision": 0.94941,
+      "recall": 0.95447,
+      "instances": 615,
+      "images": 465,
+      "drives": 7,
+      "low_confidence": false
+    },
+    {
+      "name": "cyclist",
+      "ap50": 0.94755,
+      "ap50_95": 0.74364,
+      "precision": 0.92501,
+      "recall": 0.90373,
+      "instances": 322,
+      "images": 248,
+      "drives": 11,
+      "low_confidence": false
+    },
+    {
+      "name": "truck",
+      "ap50": 0.99406,
+      "ap50_95": 0.90472,
+      "precision": 0.97742,
+      "recall": 0.99301,
+      "instances": 218,
+      "images": 218,
+      "drives": 5,
+      "low_confidence": false
+    },
+    {
+      "name": "misc",
+      "ap50": 0.97324,
+      "ap50_95": 0.78676,
+      "precision": 0.95514,
+      "recall": 0.89655,
+      "instances": 190,
+      "images": 161,
+      "drives": 6,
+      "low_confidence": false
+    },
+    {
+      "name": "tram",
+      "ap50": 0.98842,
+      "ap50_95": 0.83746,
+      "precision": 1.0,
+      "recall": 0.96801,
+      "instances": 98,
+      "images": 98,
+      "drives": 2,
+      "low_confidence": false
+    },
+    {
+      "name": "person_sitting",
+      "ap50": 0.9115,
+      "ap50_95": 0.72935,
+      "precision": 0.92297,
+      "recall": 0.85586,
+      "instances": 56,
+      "images": 27,
+      "drives": 1,
+      "low_confidence": true
+    }
+  ],
+  "low_confidence_classes": [
+    "person_sitting"
+  ],
+  "notes": [
+    "checkpoint was trained on a different split, so the validation drives here were very likely in its training data \u2014 this figure is NOT a clean held-out result and must not be reported as one",
+    "per-class AP for person_sitting rests on a single video drive and is high-variance"
+  ]
+}
