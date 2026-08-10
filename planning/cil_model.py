@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-from typing import Tuple
 
 # High-level command indices (must match config.yaml and collect_data.py)
 COMMAND_FOLLOW_LANE = 0
@@ -32,9 +31,9 @@ NUM_COMMANDS = 4
 class _Branch(nn.Module):
     """MLP prediction branch for one command."""
 
-    def __init__(self, in_features: int, num_waypoints: int) -> None:
+    def __init__(self, in_features: int, num_waypoints: int, output_dim: int | None = None) -> None:
         super().__init__()
-        out = num_waypoints * 2
+        out = output_dim if output_dim is not None else num_waypoints * 2
         self.net = nn.Sequential(
             nn.Linear(in_features, 256),
             nn.ReLU(inplace=True),
@@ -69,13 +68,36 @@ class CILModel(nn.Module):
         (follow_lane_wp, turn_left_wp, turn_right_wp, go_straight_wp)
     """
 
-    def __init__(self, num_waypoints: int = 5, pretrained: bool = True) -> None:
+    def __init__(
+        self,
+        num_waypoints: int = 5,
+        pretrained: bool = True,
+        output_mode: str = "waypoints",
+    ) -> None:
+        """
+        Args:
+            num_waypoints: Waypoints per branch, when ``output_mode`` is "waypoints".
+            pretrained: Initialise the ResNet-18 backbone from ImageNet weights.
+            output_mode: ``"waypoints"`` predicts (x, y) pairs in the vehicle
+                frame; ``"control"`` predicts (steer, throttle, brake) directly,
+                as in Codevilla et al. Direct control is what the DAgger loop
+                uses, because the expert it imitates produces controls — going
+                via waypoints would insert a hand-tuned tracking controller
+                between student and expert and make the imitation error measure
+                that controller as much as the network.
+        """
         super().__init__()
+        if output_mode not in ("waypoints", "control"):
+            raise ValueError(
+                f"output_mode must be 'waypoints' or 'control', got {output_mode!r}"
+            )
         self.num_waypoints = num_waypoints
+        self.output_mode = output_mode
+        self.output_dim = 3 if output_mode == "control" else num_waypoints * 2
 
         # ---- Backbone ----
         try:
-            from torchvision.models import resnet18, ResNet18_Weights
+            from torchvision.models import ResNet18_Weights, resnet18
             weights = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
             backbone = resnet18(weights=weights)
         except ImportError:
@@ -93,12 +115,13 @@ class CILModel(nn.Module):
         self._build_branches(self._features_dim, num_waypoints)
 
     def _build_branches(self, feat_dim: int, num_waypoints: int) -> None:
-        self.branch_follow   = _Branch(feat_dim, num_waypoints)
-        self.branch_left     = _Branch(feat_dim, num_waypoints)
-        self.branch_right    = _Branch(feat_dim, num_waypoints)
-        self.branch_straight = _Branch(feat_dim, num_waypoints)
+        out = self.output_dim
+        self.branch_follow   = _Branch(feat_dim, num_waypoints, out)
+        self.branch_left     = _Branch(feat_dim, num_waypoints, out)
+        self.branch_right    = _Branch(feat_dim, num_waypoints, out)
+        self.branch_straight = _Branch(feat_dim, num_waypoints, out)
 
-    def forward(self, image: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+    def forward(self, image: torch.Tensor) -> tuple[torch.Tensor, ...]:
         features = self.backbone(image)
         return (
             self.branch_follow(features),

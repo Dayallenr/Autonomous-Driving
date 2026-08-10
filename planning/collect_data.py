@@ -16,14 +16,14 @@ Output structure (in data/demonstrations/):
 from __future__ import annotations
 
 import argparse
-import os
+import random
 import sys
 import time
-import random
-import numpy as np
-import cv2
-import yaml
 from pathlib import Path
+
+import cv2
+import numpy as np
+import yaml
 
 # Allow running from project root
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -104,7 +104,11 @@ def collect(cfg: dict) -> None:
 
         latest_frame: dict = {"img": None}
 
-        def _on_image(img):
+        # ``latest_frame`` is bound as a default argument rather than captured by
+        # closure: it is rebound once per episode, and a late-firing callback
+        # from a previous episode's camera would otherwise write into the
+        # *current* episode's buffer.
+        def _on_image(img, latest_frame=latest_frame):
             arr = np.frombuffer(img.raw_data, dtype=np.uint8).reshape(img.height, img.width, 4)
             latest_frame["img"] = arr[:, :, :3].copy()  # BGR
 
@@ -213,7 +217,6 @@ def _extract_relative_waypoints(
     Extract the next `num_waypoints` waypoints from the route and
     express their (x, y) positions in the vehicle's local frame.
     """
-    import carla
 
     vehicle_loc = vehicle_transform.location
     yaw = np.radians(vehicle_transform.rotation.yaw)
@@ -244,7 +247,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="config/config.yaml")
     args = parser.parse_args()
 
-    with open(args.config, "r") as f:
+    with open(args.config) as f:
         cfg = yaml.safe_load(f)
 
     collect(cfg)

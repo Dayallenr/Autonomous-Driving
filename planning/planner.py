@@ -6,13 +6,12 @@ returns a list of (x, y) waypoint coordinates in the vehicle's local frame.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import torch
-from pathlib import Path
-from typing import List, Tuple
 
 from .cil_model import CILModel
-
 
 # Normalisation constants (ImageNet) — must match training preprocessing
 _MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
@@ -61,7 +60,7 @@ class CILPlanner:
         self,
         bgr_frame: np.ndarray,
         command: int,
-    ) -> List[Tuple[float, float]]:
+    ) -> list[tuple[float, float]]:
         """
         Predict future waypoints given the current camera frame and command.
 
@@ -88,7 +87,7 @@ class CILPlanner:
                      for i in range(self._num_waypoints)]
         return waypoints
 
-    def plan_fallback(self, num_waypoints: int, spacing: float = 2.0) -> List[Tuple[float, float]]:
+    def plan_fallback(self, num_waypoints: int, spacing: float = 2.0) -> list[tuple[float, float]]:
         """
         Straight-ahead fallback waypoints used before the CIL model is trained
         or when the camera frame is unavailable.

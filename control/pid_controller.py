@@ -12,14 +12,14 @@ a carla.VehicleControl object.
 from __future__ import annotations
 
 import math
+
 import numpy as np
-from typing import List, Tuple
 
 
 class PIDController:
     """Single-axis PID with integral wind-up clamping."""
 
-    def __init__(self, kp: float, ki: float, kd: float, output_limits: Tuple[float, float] = (-1.0, 1.0)) -> None:
+    def __init__(self, kp: float, ki: float, kd: float, output_limits: tuple[float, float] = (-1.0, 1.0)) -> None:
         self.kp = kp
         self.ki = ki
         self.kd = kd
@@ -96,7 +96,7 @@ class VehicleController:
 
     def run_step(
         self,
-        waypoints: List[Tuple[float, float]],
+        waypoints: list[tuple[float, float]],
         current_speed_kmh: float,
         target_speed_kmh: float | None = None,
     ):
@@ -161,7 +161,7 @@ class VehicleController:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _compute_steer(self, waypoints: List[Tuple[float, float]]) -> float:
+    def _compute_steer(self, waypoints: list[tuple[float, float]]) -> float:
         if not waypoints:
             return 0.0
 
@@ -182,7 +182,7 @@ class VehicleController:
 
     def _compute_throttle_brake(
         self, current_speed_kmh: float, target_speed_kmh: float
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         speed_error = (target_speed_kmh - current_speed_kmh) / 3.6  # convert to m/s error
         output = self._lon_pid.step(speed_error, self._dt)
 

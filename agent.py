@@ -17,18 +17,16 @@ An optional pygame HUD window visualises the camera feed and detections.
 from __future__ import annotations
 
 import math
-import sys
-import time
-import numpy as np
-from typing import List, Optional, Tuple
 
-from sensors.sensor_hub import SensorHub, SensorData
+import numpy as np
+
+from control.pid_controller import VehicleController
+from localization.ekf import EgoPose, EKFLocalizer
 from perception.detector import YOLODetector
 from perception.utils import Detection, draw_detections
-from localization.ekf import EKFLocalizer, EgoPose
-from prediction.predictor import Predictor, AgentPrediction
 from planning.planner import CILPlanner
-from control.pid_controller import VehicleController
+from prediction.predictor import AgentPrediction, Predictor
+from sensors.sensor_hub import SensorData, SensorHub
 
 
 class AutonomousAgent:
@@ -44,7 +42,6 @@ class AutonomousAgent:
     """
 
     def __init__(self, world, vehicle, cfg: dict, destination=None, enable_hud: bool = True) -> None:
-        import carla
 
         self._world   = world
         self._vehicle = vehicle
@@ -75,7 +72,7 @@ class AutonomousAgent:
         self._route         = []
 
         # ---- State ----
-        self._ego_pose: Optional[EgoPose] = None
+        self._ego_pose: EgoPose | None = None
         self._step = 0
 
         # ---- HUD ----
@@ -118,18 +115,18 @@ class AutonomousAgent:
         self._ego_pose = self._localizer.get_pose(data.timestamp)
 
         # 2. Perception
-        detections: List[Detection] = []
+        detections: list[Detection] = []
         if data.camera_frame is not None:
             detections = self._detector.detect(data.camera_frame)
 
         # 3. Prediction
-        predictions: List[AgentPrediction] = self._predictor.update(detections)
+        predictions: list[AgentPrediction] = self._predictor.update(detections)
 
         # 4. High-level command from route planner
         command = self._get_navigation_command()
 
         # 5. Planning
-        waypoints: List[Tuple[float, float]] = []
+        waypoints: list[tuple[float, float]] = []
         if data.camera_frame is not None:
             try:
                 waypoints = self._planner.plan(data.camera_frame, command)
@@ -171,7 +168,6 @@ class AutonomousAgent:
 
     def _get_navigation_command(self) -> int:
         """Query GlobalRoutePlanner for the current high-level command."""
-        import carla
         from carla import RoadOption
 
         try:

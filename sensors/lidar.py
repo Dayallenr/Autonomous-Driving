@@ -3,10 +3,10 @@ LiDAR sensor setup and point cloud buffering for CARLA 0.9.14.
 """
 from __future__ import annotations
 
-import numpy as np
-import weakref
 import threading
-from typing import Optional
+import weakref
+
+import numpy as np
 
 
 class LiDAR:
@@ -31,7 +31,7 @@ class LiDAR:
         import carla
 
         self._lock = threading.Lock()
-        self._points: Optional[np.ndarray] = None
+        self._points: np.ndarray | None = None
         self._timestamp: float = 0.0
 
         bp_lib = world.get_blueprint_library()
@@ -64,7 +64,7 @@ class LiDAR:
             self._points = points.copy()
             self._timestamp = data.timestamp
 
-    def get_points(self) -> Optional[np.ndarray]:
+    def get_points(self) -> np.ndarray | None:
         """Return the latest point cloud as (N, 4) float32 [x, y, z, intensity]."""
         with self._lock:
             return self._points.copy() if self._points is not None else None

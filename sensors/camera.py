@@ -3,10 +3,11 @@ RGB camera sensor setup and frame acquisition for CARLA 0.9.14.
 """
 from __future__ import annotations
 
-import numpy as np
-import weakref
 import threading
-from typing import Callable, Optional
+import weakref
+from collections.abc import Callable
+
+import numpy as np
 
 
 class RGBCamera:
@@ -28,9 +29,9 @@ class RGBCamera:
         import carla
 
         self._lock = threading.Lock()
-        self._frame: Optional[np.ndarray] = None
+        self._frame: np.ndarray | None = None
         self._frame_timestamp: float = 0.0
-        self._callback: Optional[Callable] = None
+        self._callback: Callable | None = None
 
         bp_lib = world.get_blueprint_library()
         camera_bp = bp_lib.find("sensor.camera.rgb")
@@ -65,7 +66,7 @@ class RGBCamera:
         if self._callback is not None:
             self._callback(bgr, image.timestamp)
 
-    def get_frame(self) -> Optional[np.ndarray]:
+    def get_frame(self) -> np.ndarray | None:
         """Return the latest BGR frame (or None if not yet available)."""
         with self._lock:
             return self._frame.copy() if self._frame is not None else None

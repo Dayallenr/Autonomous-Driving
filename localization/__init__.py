@@ -1,1 +1,3 @@
-from .ekf import EKFLocalizer, EgoPose
+from .ekf import EgoPose, EKFLocalizer
+
+__all__ = ["EKFLocalizer", "EgoPose"]

@@ -3,10 +3,10 @@ Utility helpers for the perception module.
 """
 from __future__ import annotations
 
-import numpy as np
-import cv2
 from dataclasses import dataclass, field
-from typing import List
+
+import cv2
+import numpy as np
 
 
 @dataclass
@@ -53,7 +53,7 @@ def compute_iou(box_a: np.ndarray, box_b: np.ndarray) -> float:
 
 def draw_detections(
     image: np.ndarray,
-    detections: List[Detection],
+    detections: list[Detection],
     color_map: dict | None = None,
 ) -> np.ndarray:
     """Draw bounding boxes and labels on an BGR image. Returns a new image."""

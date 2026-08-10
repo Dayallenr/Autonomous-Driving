@@ -3,12 +3,9 @@ GNSS and IMU sensor setup for CARLA 0.9.14.
 """
 from __future__ import annotations
 
-import math
-import numpy as np
-import weakref
 import threading
-from dataclasses import dataclass, field
-from typing import Optional
+import weakref
+from dataclasses import dataclass
 
 
 @dataclass

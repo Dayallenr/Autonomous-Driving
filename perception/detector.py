@@ -7,14 +7,11 @@ tram, misc.
 """
 from __future__ import annotations
 
-import numpy as np
-import cv2
-import torch
 from pathlib import Path
-from typing import List
+
+import numpy as np
 
 from .utils import Detection
-
 
 # KITTI class index → name
 KITTI_CLASSES = {
@@ -56,20 +53,20 @@ class YOLODetector:
             from ultralytics import YOLO
             self._model = YOLO(str(model_path))
             self._backend = "ultralytics"
-        except ImportError:
-            # Fallback: load raw state dict if ultralytics is not installed
-            # (should not happen in a correctly set-up environment)
+        except ImportError as error:
+            # There is no usable fallback: the checkpoint is an Ultralytics
+            # object, so a raw state dict cannot be loaded without the package.
             raise ImportError(
                 "ultralytics is required to run the perception model. "
                 "Install it with: pip install ultralytics>=8.4.0"
-            )
+            ) from error
 
         print(
             f"[Perception] Loaded YOLO model from '{model_path}' "
             f"on device='{device}' | classes={list(KITTI_CLASSES.values())}"
         )
 
-    def detect(self, frame: np.ndarray) -> List[Detection]:
+    def detect(self, frame: np.ndarray) -> list[Detection]:
         """
         Run detection on a single image frame.
 
@@ -91,7 +88,7 @@ class YOLODetector:
             verbose=False,
         )
 
-        detections: List[Detection] = []
+        detections: list[Detection] = []
         for result in results:
             if result.boxes is None:
                 continue
@@ -99,7 +96,7 @@ class YOLODetector:
             confs = result.boxes.conf.cpu().numpy()
             class_ids = result.boxes.cls.cpu().numpy().astype(int)
 
-            for bbox, conf, cid in zip(boxes_xyxy, confs, class_ids):
+            for bbox, conf, cid in zip(boxes_xyxy, confs, class_ids, strict=True):
                 detections.append(
                     Detection(
                         class_id=int(cid),
@@ -112,6 +109,6 @@ class YOLODetector:
         detections.sort(key=lambda d: d.confidence, reverse=True)
         return detections
 
-    def detect_batch(self, frames: List[np.ndarray]) -> List[List[Detection]]:
+    def detect_batch(self, frames: list[np.ndarray]) -> list[list[Detection]]:
         """Run detection on a batch of frames."""
         return [self.detect(f) for f in frames]

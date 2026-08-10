@@ -1,0 +1,147 @@
+// PathFinder worker-coordination contract.
+//
+// Division of labour between the queue and gRPC — they are not redundant:
+//
+//   SQS  carries *work*. It is durable, it redelivers on worker death, and it
+//        needs no knowledge of who is alive. That is exactly right for episode
+//        assignment and exactly wrong for anything interactive.
+//   gRPC carries *control and status*. Heartbeats, live progress, and result
+//        submission are request/response with a caller who wants an answer now.
+//        Routing those through a queue would mean polling for replies.
+//
+// Using one for both is the common mistake. A queue-based heartbeat has
+// latency measured in poll intervals; a gRPC-based work assignment loses the
+// episode when the worker dies.
+//
+// Regenerate stubs with:
+//   python scripts/generate_protos.py
+
+syntax = "proto3";
+
+package pathfinder.v1;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared types
+// ─────────────────────────────────────────────────────────────────────────────
+
+message EpisodeSpec {
+  string episode_id = 1;
+  string town = 2;
+  string weather = 3;
+  double route_length_m = 4;
+  int32 seed = 5;
+  int32 max_steps = 6;
+  double delta_seconds = 7;
+  double traffic_density = 8;
+  double pedestrian_density = 9;
+}
+
+message InfractionCount {
+  string kind = 1;
+  int32 count = 2;
+}
+
+// One scored episode. Mirrors metrics.driving_score.EpisodeScore.
+message EpisodeResult {
+  string episode_id = 1;
+  string worker_id = 2;
+  double route_completion = 3;
+  double infraction_penalty = 4;
+  double driving_score = 5;
+  repeated InfractionCount infractions = 6;
+  double distance_travelled_m = 7;
+  double route_length_m = 8;
+  int64 frames = 9;
+  double duration_seconds = 10;
+  double mean_fps = 11;
+  string status = 12;
+  string termination_reason = 13;
+  // Provenance: which weights, trained on which data. Carried on the result so
+  // a stored benchmark row can always answer "what produced this number?"
+  string model_version = 14;
+  string dataset_version = 15;
+  // Which simulator produced it. A kinematic-backend score is not comparable to
+  // a CARLA score, and recording the backend is what stops the two being
+  // silently averaged together.
+  string simulator_backend = 16;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Coordinator service
+// ─────────────────────────────────────────────────────────────────────────────
+
+message RegisterRequest {
+  string worker_id = 1;
+  string hostname = 2;
+  string simulator_backend = 3;
+  int32 carla_port = 4;
+}
+
+message RegisterResponse {
+  bool accepted = 1;
+  string run_id = 2;
+  // Server-assigned heartbeat cadence. The server owns this so it can widen the
+  // interval under load rather than being heartbeated to death by its own fleet.
+  double heartbeat_interval_seconds = 3;
+  string reason = 4;
+}
+
+message HeartbeatRequest {
+  string worker_id = 1;
+  string current_episode_id = 2;
+  int64 frames_completed = 3;
+  double episode_progress = 4;  // [0,1]
+  int32 episodes_completed = 5;
+}
+
+message HeartbeatResponse {
+  // Cooperative cancellation: the coordinator can tell a worker to stop between
+  // episodes rather than killing the process and losing its in-flight result.
+  bool should_stop = 1;
+  string reason = 2;
+}
+
+message SubmitResultRequest {
+  EpisodeResult result = 1;
+}
+
+message SubmitResultResponse {
+  bool accepted = 1;
+  // True when this episode_id was already recorded. Delivery is at-least-once,
+  // so duplicates are expected; the coordinator overwrites and reports the fact
+  // rather than treating it as an error.
+  bool duplicate = 2;
+}
+
+message RunStatusRequest {
+  string run_id = 1;
+}
+
+message WorkerStatus {
+  string worker_id = 1;
+  string current_episode_id = 2;
+  double episode_progress = 3;
+  int32 episodes_completed = 4;
+  double seconds_since_heartbeat = 5;
+  bool healthy = 6;
+}
+
+message RunStatusResponse {
+  string run_id = 1;
+  int32 episodes_total = 2;
+  int32 episodes_completed = 3;
+  int32 episodes_in_flight = 4;
+  double mean_driving_score = 5;
+  double mean_route_completion = 6;
+  repeated WorkerStatus workers = 7;
+  double elapsed_seconds = 8;
+}
+
+service Coordinator {
+  rpc RegisterWorker(RegisterRequest) returns (RegisterResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc SubmitResult(SubmitResultRequest) returns (SubmitResultResponse);
+  rpc GetRunStatus(RunStatusRequest) returns (RunStatusResponse);
+  // Server-streaming live progress, for a dashboard that should not poll.
+  rpc WatchRun(RunStatusRequest) returns (stream RunStatusResponse);
+}

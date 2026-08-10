@@ -10,10 +10,9 @@ fast while the perception (YOLO) and planning (CIL) do the heavy lifting.
 """
 from __future__ import annotations
 
-import math
-import numpy as np
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
+
+import numpy as np
 
 from perception.utils import Detection, compute_iou
 
@@ -52,9 +51,9 @@ class AgentPrediction:
     class_name: str
     current_bbox: np.ndarray
     # List of predicted bbox centres [(cx, cy), ...] over the horizon
-    predicted_centers: List[np.ndarray] = field(default_factory=list)
+    predicted_centers: list[np.ndarray] = field(default_factory=list)
     # Predicted bounding boxes [x1,y1,x2,y2] at each step
-    predicted_bboxes: List[np.ndarray] = field(default_factory=list)
+    predicted_bboxes: list[np.ndarray] = field(default_factory=list)
 
 
 class Predictor:
@@ -76,13 +75,13 @@ class Predictor:
         self._min_hits = pred_cfg.get("min_hits", 3)
         self._horizon_steps = int(self._horizon_s / self._dt)
 
-        self._tracks: Dict[int, Track] = {}
+        self._tracks: dict[int, Track] = {}
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def update(self, detections: List[Detection]) -> List[AgentPrediction]:
+    def update(self, detections: list[Detection]) -> list[AgentPrediction]:
         """
         Update all tracks with the new detection list.
 
@@ -132,7 +131,7 @@ class Predictor:
             del self._tracks[tid]
 
         # Build predictions for confirmed tracks
-        predictions: List[AgentPrediction] = []
+        predictions: list[AgentPrediction] = []
         for trk in self._tracks.values():
             if not trk.is_confirmed:
                 continue
@@ -148,7 +147,7 @@ class Predictor:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _match(self, detections: List[Detection]):
+    def _match(self, detections: list[Detection]):
         """
         Hungarian-like greedy IoU matching between detections and tracks.
         Returns (matched, unmatched_dets, unmatched_trks).
@@ -163,7 +162,7 @@ class Predictor:
             for t_idx, tid in enumerate(track_ids):
                 iou_matrix[d_idx, t_idx] = compute_iou(det.bbox, self._tracks[tid].bbox)
 
-        matched: List[tuple] = []
+        matched: list[tuple] = []
         used_dets = set()
         used_trks = set()
 
@@ -193,8 +192,8 @@ class Predictor:
         w = float(trk.bbox[2] - trk.bbox[0])
         h = float(trk.bbox[3] - trk.bbox[1])
 
-        predicted_centers: List[np.ndarray] = []
-        predicted_bboxes: List[np.ndarray] = []
+        predicted_centers: list[np.ndarray] = []
+        predicted_bboxes: list[np.ndarray] = []
 
         for step in range(1, self._horizon_steps + 1):
             ncx = cx + trk.vx * step

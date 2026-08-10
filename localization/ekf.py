@@ -12,9 +12,9 @@ No external dependencies beyond numpy — no filterpy required.
 from __future__ import annotations
 
 import math
-import numpy as np
 from dataclasses import dataclass
-from typing import Optional
+
+import numpy as np
 
 from sensors.gnss_imu import GNSSMeasurement, IMUMeasurement
 
@@ -91,8 +91,8 @@ class EKFLocalizer:
         self._H[2, 2] = 1.0
 
         # Origin for GNSS projection — set on first fix
-        self._origin_lat: Optional[float] = None
-        self._origin_lon: Optional[float] = None
+        self._origin_lat: float | None = None
+        self._origin_lon: float | None = None
         self._origin_alt: float = 0.0
         self._initialized: bool = False
 

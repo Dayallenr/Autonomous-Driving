@@ -13,23 +13,19 @@ from __future__ import annotations
 
 import argparse
 import sys
-import os
-import random
-import numpy as np
 from pathlib import Path
 
+import cv2
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader, random_split
-
 import yaml
-import cv2
+from torch.utils.data import DataLoader, Dataset, random_split
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from planning.cil_model import CILModel, NUM_COMMANDS
-
+from planning.cil_model import NUM_COMMANDS, CILModel
 
 # ---------------------------------------------------------------------------
 # Dataset
@@ -196,7 +192,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="config/config.yaml")
     args = parser.parse_args()
 
-    with open(args.config, "r") as f:
+    with open(args.config) as f:
         cfg = yaml.safe_load(f)
 
     train(cfg)

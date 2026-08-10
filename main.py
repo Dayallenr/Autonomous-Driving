@@ -13,10 +13,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sys
-import time
-import traceback
 import random
+import sys
+import traceback
+
 import yaml
 
 
@@ -44,7 +44,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    with open(args.config, "r") as f:
+    with open(args.config) as f:
         cfg = yaml.safe_load(f)
 
     carla_cfg = cfg.get("carla", {})

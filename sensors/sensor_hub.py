@@ -4,22 +4,22 @@ vehicle and provides a single tick-based data snapshot to the agent loop.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
+
 import numpy as np
 
 from .camera import RGBCamera
+from .gnss_imu import GNSSMeasurement, GNSSSensor, IMUMeasurement, IMUSensor
 from .lidar import LiDAR
-from .gnss_imu import GNSSSensor, IMUSensor, GNSSMeasurement, IMUMeasurement
 
 
 @dataclass
 class SensorData:
     """Snapshot of all sensor readings at one simulation tick."""
-    camera_frame: Optional[np.ndarray] = None       # BGR (H, W, 3) uint8
-    lidar_points: Optional[np.ndarray] = None       # (N, 4) float32 [x,y,z,intensity]
-    gnss: Optional[GNSSMeasurement] = None
-    imu: Optional[IMUMeasurement] = None
+    camera_frame: np.ndarray | None = None       # BGR (H, W, 3) uint8
+    lidar_points: np.ndarray | None = None       # (N, 4) float32 [x,y,z,intensity]
+    gnss: GNSSMeasurement | None = None
+    imu: IMUMeasurement | None = None
     timestamp: float = 0.0
 
     @property
