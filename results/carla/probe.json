@@ -69,8 +69,9 @@
     "port": 8000
   },
   "route_planner": {
-    "importable": false,
-    "error": "No module named 'agents'"
+    "discovered_at": "C:\\Users\\Dayallen Ragu\\Downloads\\CARLA_0.9.16\\PythonAPI\\carla",
+    "importable": true,
+    "road_option": true
   },
   "map": "Carla/Maps/Town10HD_Opt",
   "spawn_points": 155,
@@ -80,8 +81,8 @@
     "steps": 120,
     "delta_seconds": 0.05,
     "ticks_per_second": [
-      209.51,
-      210.55
+      180.85,
+      172.0
     ],
     "deterministic": true,
     "max_divergence_m": 0.0,
