@@ -17,6 +17,13 @@ ENV/
 
 # PyTorch model checkpoints (large binary files — track separately if needed)
 models/cil_model.pt
+
+# Ultralytics downloads pretrained base weights into the working directory the
+# first time a model name is passed (yolov8m.pt, yolo26m.pt, ...). Those are
+# upstream COCO weights, not results — committing them adds ~50 MB each and
+# invites confusing them with the KITTI-trained checkpoints in models/.
+/yolo*.pt
+/rtdetr*.pt
 # Keep best_perception_model.pt tracked only if you want it in the repo
 # models/best_perception_model.pt
 

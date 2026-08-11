@@ -135,6 +135,12 @@ def main() -> int:
     logger.info("\ntraining %s for %d epochs on device %s", arguments.model, arguments.epochs, device)
     logger.info("dataset: %s", data_yaml)
 
+    # Ultralytics resolves a *relative* `project` against its own runs_dir
+    # setting, so "results/perception" becomes "runs/detect/results/perception".
+    # An absolute path is interpreted literally.
+    output_root = arguments.out.resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+
     model = YOLO(arguments.model)
     model.train(
         data=str(data_yaml),
@@ -146,7 +152,7 @@ def main() -> int:
         deterministic=True,
         workers=arguments.workers,
         patience=arguments.patience,
-        project=str(arguments.out),
+        project=str(output_root),
         name=name,
         exist_ok=True,
         plots=True,
@@ -164,10 +170,21 @@ def main() -> int:
         fliplr=0.5,
     )
 
-    run_directory = arguments.out / name
+    # Ask the trainer where it actually wrote rather than reconstructing the
+    # path. Reconstructing is what silently lost an hour of training once: the
+    # run landed under runs/detect/, this looked in results/perception/, found
+    # nothing, and exited before writing the report — and runs/ is gitignored,
+    # so the checkpoint was invisible to git as well.
+    run_directory = Path(getattr(model.trainer, "save_dir", output_root / name))
     best = run_directory / "weights" / "best.pt"
     if not best.exists():
-        logger.error("training finished but no checkpoint at %s", best)
+        logger.error(
+            "training finished but no checkpoint at %s\n"
+            "the trainer reported save_dir=%s — if that differs from the "
+            "--out directory, evaluate it directly with:\n"
+            "  python scripts/eval_detector.py --weights %s --name %s",
+            best, run_directory, best, name,
+        )
         return 1
 
     logger.info("\nevaluating %s on held-out drives", best)
