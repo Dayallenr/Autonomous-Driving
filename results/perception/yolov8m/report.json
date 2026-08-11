@@ -1,0 +1,108 @@
+{
+  "weights": "models/yolov8m.pt",
+  "dataset": "data/kitti_seqdisjoint.yaml",
+  "map50": 0.47516,
+  "map50_95": 0.30693,
+  "precision": 0.58696,
+  "recall": 0.43725,
+  "images": 1376,
+  "instances": 9079,
+  "device": "mps",
+  "evaluated_at": "2026-08-11T03:32:09.707624+00:00",
+  "per_class": [
+    {
+      "name": "car",
+      "ap50": 0.87217,
+      "ap50_95": 0.60405,
+      "precision": 0.76999,
+      "recall": 0.83011,
+      "instances": 6663,
+      "images": 1376,
+      "drives": 13,
+      "low_confidence": false
+    },
+    {
+      "name": "pedestrian",
+      "ap50": 0.62554,
+      "ap50_95": 0.31758,
+      "precision": 0.7246,
+      "recall": 0.50786,
+      "instances": 917,
+      "images": 293,
+      "drives": 10,
+      "low_confidence": false
+    },
+    {
+      "name": "van",
+      "ap50": 0.44205,
+      "ap50_95": 0.30402,
+      "precision": 0.56401,
+      "recall": 0.41018,
+      "instances": 615,
+      "images": 465,
+      "drives": 7,
+      "low_confidence": false
+    },
+    {
+      "name": "cyclist",
+      "ap50": 0.42582,
+      "ap50_95": 0.24917,
+      "precision": 0.55529,
+      "recall": 0.39752,
+      "instances": 322,
+      "images": 248,
+      "drives": 11,
+      "low_confidence": false
+    },
+    {
+      "name": "truck",
+      "ap50": 0.79431,
+      "ap50_95": 0.60213,
+      "precision": 0.69135,
+      "recall": 0.74771,
+      "instances": 218,
+      "images": 218,
+      "drives": 5,
+      "low_confidence": false
+    },
+    {
+      "name": "misc",
+      "ap50": 0.10602,
+      "ap50_95": 0.05191,
+      "precision": 0.47188,
+      "recall": 0.08421,
+      "instances": 190,
+      "images": 161,
+      "drives": 6,
+      "low_confidence": false
+    },
+    {
+      "name": "tram",
+      "ap50": 0.53017,
+      "ap50_95": 0.32487,
+      "precision": 0.91856,
+      "recall": 0.52041,
+      "instances": 98,
+      "images": 98,
+      "drives": 2,
+      "low_confidence": false
+    },
+    {
+      "name": "person_sitting",
+      "ap50": 0.00519,
+      "ap50_95": 0.00174,
+      "precision": 0.0,
+      "recall": 0.0,
+      "instances": 56,
+      "images": 27,
+      "drives": 1,
+      "low_confidence": true
+    }
+  ],
+  "low_confidence_classes": [
+    "person_sitting"
+  ],
+  "notes": [
+    "per-class AP for person_sitting rests on a single video drive and is high-variance"
+  ]
+}

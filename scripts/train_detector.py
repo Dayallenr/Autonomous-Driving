@@ -107,7 +107,15 @@ def main() -> int:
     parser.add_argument("--device", default="auto", help="auto, cpu, mps, or a CUDA index")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--workers", type=int, default=8)
-    parser.add_argument("--patience", type=int, default=20)
+    parser.add_argument(
+        "--patience",
+        type=int,
+        default=0,
+        help=(
+            "epochs without improvement before stopping; 0 disables early stopping "
+            "(the default, and deliberately so — see the note in this file)"
+        ),
+    )
     parser.add_argument(
         "--out", type=Path, default=Path("results/perception"), help="report directory"
     )
@@ -151,6 +159,21 @@ def main() -> int:
         seed=arguments.seed,
         deterministic=True,
         workers=arguments.workers,
+        # Early stopping defaults OFF, which is not the usual advice and is worth
+        # the paragraph.
+        #
+        # A YOLO run's best epochs are its last ones, for two reasons that both
+        # land at the end of the schedule: the learning rate anneals to lr0*lrf,
+        # and `close_mosaic` switches mosaic augmentation off for the final 10
+        # epochs so the model fine-tunes on undistorted images. Validation mAP
+        # while mosaic is on is therefore not a reading of the model you will
+        # ship, and it plateaus or wanders for long stretches mid-run.
+        #
+        # Early stopping reads that plateau as convergence. A first run here
+        # stopped at epoch 30 of 60 with the LR still at 4.3x its final value and
+        # the mosaic-off phase never reached — costing an hour of GPU time to
+        # measure a model that was never allowed to finish. Ultralytics maps
+        # patience=0 to infinity, so the schedule always completes.
         patience=arguments.patience,
         project=str(output_root),
         name=name,
