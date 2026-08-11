@@ -24,6 +24,10 @@ import time
 import traceback
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from pathfinder.sim.carla_paths import CARLA_HINT, ensure_agents_importable  # noqa: E402
+
 REQUIRED_BLUEPRINTS = (
     "vehicle.tesla.model3",
     "sensor.camera.rgb",
@@ -121,6 +125,12 @@ def probe_route_planner() -> dict:
     """The ``agents`` package ships in the CARLA release, not the pip wheel."""
     section("route planner (agents package)")
     result = {}
+
+    located = ensure_agents_importable()
+    if located is not None:
+        result["discovered_at"] = str(located)
+        print(f"  discovered CARLA PythonAPI at: {located}")
+
     try:
         from agents.navigation.global_route_planner import GlobalRoutePlanner  # noqa: F401
 
@@ -137,10 +147,9 @@ def probe_route_planner() -> dict:
     except Exception as error:
         result["importable"] = False
         result["error"] = str(error)
-        print(f"  !! agents package NOT importable: {error}")
-        print("     It ships in the CARLA release under PythonAPI/carla/, not the")
-        print("     pip wheel. Add that directory to PYTHONPATH, e.g.")
-        print("     set PYTHONPATH=C:\\CARLA\\PythonAPI\\carla")
+        print(f"  !! agents package NOT importable: {error}\n")
+        for line in CARLA_HINT.splitlines():
+            print(f"     {line}")
     return {"route_planner": result}
 
 
