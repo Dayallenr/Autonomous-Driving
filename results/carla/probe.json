@@ -1,0 +1,99 @@
+{
+  "client_version": "0.9.16",
+  "server_version": "0.9.16",
+  "python_version": "3.12.10",
+  "carla_module": "C:\\Users\\Dayallen Ragu\\CodingProjects\\Autonomous-Driving\\venv\\Lib\\site-packages\\carla\\__init__.py",
+  "version_match": true,
+  "available_maps": [
+    "AnnotationColorLandscape",
+    "Town01",
+    "Town01_Opt",
+    "Town02",
+    "Town02_Opt",
+    "Town03",
+    "Town03_Opt",
+    "Town04",
+    "Town04_Opt",
+    "Town05",
+    "Town05_Opt",
+    "Town06",
+    "Town06_Opt",
+    "Town07",
+    "Town07_Opt",
+    "Town10HD",
+    "Town10HD_Opt",
+    "Town11",
+    "Town12",
+    "Town13",
+    "Town15"
+  ],
+  "blueprints": {
+    "vehicle.tesla.model3": true,
+    "sensor.camera.rgb": true,
+    "sensor.other.collision": true,
+    "sensor.other.lane_invasion": true,
+    "sensor.other.obstacle": true,
+    "walker.pedestrian.0001": true,
+    "controller.ai.walker": true
+  },
+  "vehicle_count": 41,
+  "walker_count": 52,
+  "settings_fields": {
+    "synchronous_mode": true,
+    "fixed_delta_seconds": true,
+    "substepping": true,
+    "max_substep_delta_time": true,
+    "max_substeps": true,
+    "deterministic_ragdolls": true,
+    "no_rendering_mode": true,
+    "spectator_as_ego": true
+  },
+  "all_settings_fields": [
+    "actor_active_distance",
+    "deterministic_ragdolls",
+    "fixed_delta_seconds",
+    "max_culling_distance",
+    "max_substep_delta_time",
+    "max_substeps",
+    "no_rendering_mode",
+    "spectator_as_ego",
+    "substepping",
+    "synchronous_mode",
+    "tile_stream_distance"
+  ],
+  "traffic_manager": {
+    "set_random_device_seed": true,
+    "set_synchronous_mode": true,
+    "set_hybrid_physics_mode": true,
+    "global_percentage_speed_difference": true,
+    "port": 8000
+  },
+  "route_planner": {
+    "importable": false,
+    "error": "No module named 'agents'"
+  },
+  "map": "Carla/Maps/Town10HD_Opt",
+  "spawn_points": 155,
+  "topology_edges": 200,
+  "traffic_lights": 15,
+  "drive": {
+    "steps": 120,
+    "delta_seconds": 0.05,
+    "ticks_per_second": [
+      209.51,
+      210.55
+    ],
+    "deterministic": true,
+    "max_divergence_m": 0.0,
+    "final_positions": [
+      [
+        -31.100769,
+        24.593685
+      ],
+      [
+        -31.100769,
+        24.593685
+      ]
+    ]
+  }
+}

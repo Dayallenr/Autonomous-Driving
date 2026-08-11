@@ -1,32 +1,4 @@
 {
-  "baseline_random_split": {
-    "drives_shared": 106,
-    "drives_total": 141,
-    "temporal_adjacency": {
-      "1": {
-        "fraction": 0.34024064171123,
-        "frames": 509
-      },
-      "10": {
-        "fraction": 0.9699197860962567,
-        "frames": 1451
-      },
-      "2": {
-        "fraction": 0.7633689839572193,
-        "frames": 1142
-      },
-      "3": {
-        "fraction": 0.8328877005347594,
-        "frames": 1246
-      },
-      "5": {
-        "fraction": 0.8863636363636364,
-        "frames": 1326
-      }
-    },
-    "train_frames": 5985,
-    "val_frames": 1496
-  },
   "class_distribution": {
     "train": {
       "car": {
