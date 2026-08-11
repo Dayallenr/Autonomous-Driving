@@ -38,7 +38,7 @@ __all__ = [
 
 class Command(enum.IntEnum):
     """High-level navigation command. Values index the CIL model's branches, so
-    they must match ``planning/cil_model.py``."""
+    they must match ``pathfinder/planning/cil_model.py``."""
 
     FOLLOW_LANE = 0
     TURN_LEFT = 1

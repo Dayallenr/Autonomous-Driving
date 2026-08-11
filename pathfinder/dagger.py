@@ -258,7 +258,7 @@ def run_dagger(
             f"need at least 2 iterations to measure error reduction, got {config.iterations}"
         )
 
-    from planning.cil_model import CILModel
+    from pathfinder.planning.cil_model import CILModel
 
     torch.manual_seed(config.seed)
     rng = np.random.default_rng(config.seed)

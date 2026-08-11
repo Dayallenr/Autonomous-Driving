@@ -1,0 +1,9 @@
+# The coordinator only serves pathfinder.rpc.server, which imports
+# pathfinder.rpc.coordinator + the generated stubs — nothing else. Deliberately
+# not the repo's full requirements.txt: that pulls in torch/ultralytics
+# (~2GB) the coordinator never touches.
+grpcio>=1.83.0
+# grpcio does not depend on protobuf at runtime (only grpcio-tools, used for
+# codegen, does) — the generated *_pb2.py stubs import google.protobuf
+# directly, so this has to be listed explicitly.
+protobuf>=5.26.0

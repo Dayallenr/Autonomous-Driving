@@ -1,0 +1,14 @@
+# Dev/test-only dependencies — not needed to run the app, only to test and
+# lint it. Installed on top of requirements.txt.
+-r requirements.txt
+
+# Linting
+ruff>=0.6.0
+
+# Mocked-AWS tests for pathfinder/cloud/ (SQS, S3, Kinesis) — lets CI exercise
+# the boto3-backed code paths without real credentials or LocalStack.
+moto[sqs,s3,kinesis]>=5.0.0
+
+# Terraform static analysis (Phase 7) — misconfiguration scanning without
+# ever touching real AWS.
+checkov>=3.2.0

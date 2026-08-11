@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pathfinder-config
+  namespace: pathfinder
+data:
+  episodes-total: "12"
+  sqs-queue-url: "${SQS_QUEUE_URL}"
+  telemetry-stream-name: "${KINESIS_STREAM_NAME}"
+  s3-bucket: "${S3_TELEMETRY_BUCKET}"
+  aws-region: "${AWS_REGION}"

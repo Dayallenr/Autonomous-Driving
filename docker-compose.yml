@@ -1,0 +1,83 @@
+# Local multi-worker demo: a coordinator, a LocalStack-backed SQS queue
+# (needed so multiple *separate* worker containers share one queue — an
+# in-process "local" MessageQueue can't cross container boundaries), and N
+# kinematic workers.
+#
+# Usage:
+#   docker compose up --build --scale worker=4
+#
+# `enqueue` is a one-shot seeding job: it runs once, pushes the benchmark
+# suite onto the queue, and exits. Workers wait for it to succeed before
+# starting (requires Docker Compose v2.20+ for `service_completed_successfully`).
+
+services:
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      - SERVICES=sqs
+      - AWS_DEFAULT_REGION=us-east-1
+      # LocalStack's default queue-URL strategy ("domain") returns
+      # sqs.<region>.localhost.localstack.cloud — a public DNS name that only
+      # resolves to 127.0.0.1 from the host machine. Containers on this
+      # compose network can't resolve it. "path" makes it echo back whatever
+      # host:port the request actually came in on (localstack:4566 here),
+      # which every container on this network can resolve.
+      - SQS_ENDPOINT_STRATEGY=path
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile.coordinator
+    ports:
+      - "50051:50051"
+    command: ["--port", "50051", "--episodes-total", "${EPISODES_TOTAL:-8}"]
+
+  enqueue:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    entrypoint: ["python", "scripts/enqueue_episodes.py"]
+    command:
+      [
+        "--count", "${EPISODES_TOTAL:-8}",
+        "--queue-backend", "sqs",
+        "--queue-name", "pathfinder-episodes",
+        "--queue-endpoint-url", "http://localstack:4566",
+      ]
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    depends_on:
+      coordinator:
+        condition: service_started
+      enqueue:
+        condition: service_completed_successfully
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    command:
+      [
+        "--coordinator", "coordinator:50051",
+        "--queue-backend", "sqs",
+        "--queue-name", "pathfinder-episodes",
+        "--queue-endpoint-url", "http://localstack:4566",
+        "--simulator-backend", "kinematic",
+        "--idle-timeout-seconds", "10",
+      ]

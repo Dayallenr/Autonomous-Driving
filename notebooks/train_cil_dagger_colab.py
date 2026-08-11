@@ -152,7 +152,7 @@ for key, value in expert_summary.to_dict().items():
 import time
 
 from pathfinder.dagger import DAggerConfig, run_dagger
-from planning.cil_model import CILModel
+from pathfinder.planning.cil_model import CILModel
 
 config = DAggerConfig(
     iterations=8,

@@ -1,0 +1,20 @@
+# Worker: pulls episodes off a queue, drives them on the kinematic backend,
+# reports results over gRPC (scripts/run_worker.py). Also carries
+# enqueue_episodes.py so the same image can seed a run via `docker compose run`.
+# CARLA needs a GPU and a running CarlaUE4 server this container doesn't have,
+# so this image is kinematic-only — see docker/requirements-worker.txt.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY docker/requirements-worker.txt .
+RUN pip install --no-cache-dir -r requirements-worker.txt
+
+COPY pathfinder/ pathfinder/
+COPY scripts/run_worker.py scripts/run_worker.py
+COPY scripts/enqueue_episodes.py scripts/enqueue_episodes.py
+
+RUN useradd --create-home --uid 1000 pathfinder
+USER pathfinder
+
+ENTRYPOINT ["python", "scripts/run_worker.py"]

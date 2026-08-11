@@ -1,0 +1,10 @@
+# The worker runs the kinematic backend (pure math, no CARLA/GPU) plus gRPC
+# and an SQS-shaped queue client. Deliberately not the repo's full
+# requirements.txt: no torch/ultralytics here, since this worker never runs
+# perception or the CIL model — CARLA-backed episodes need a GPU host, not a
+# container, and are out of scope for this image.
+grpcio>=1.83.0
+# grpcio does not depend on protobuf at runtime — see requirements-coordinator.txt.
+protobuf>=5.26.0
+numpy>=1.24.0
+boto3>=1.43.0

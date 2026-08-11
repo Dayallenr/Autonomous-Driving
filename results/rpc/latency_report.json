@@ -1,0 +1,42 @@
+{
+  "calls_per_rpc": 500,
+  "transport": "grpc.aio over loopback TCP (127.0.0.1), insecure channel",
+  "results": [
+    {
+      "rpc": "RegisterWorker",
+      "calls": 500,
+      "mean_ms": 0.27,
+      "p50_ms": 0.258,
+      "p95_ms": 0.313,
+      "p99_ms": 0.611,
+      "max_ms": 0.973
+    },
+    {
+      "rpc": "Heartbeat",
+      "calls": 500,
+      "mean_ms": 0.262,
+      "p50_ms": 0.253,
+      "p95_ms": 0.284,
+      "p99_ms": 0.442,
+      "max_ms": 1.18
+    },
+    {
+      "rpc": "SubmitResult",
+      "calls": 500,
+      "mean_ms": 0.263,
+      "p50_ms": 0.253,
+      "p95_ms": 0.296,
+      "p99_ms": 0.6,
+      "max_ms": 0.751
+    },
+    {
+      "rpc": "GetRunStatus",
+      "calls": 500,
+      "mean_ms": 0.796,
+      "p50_ms": 0.779,
+      "p95_ms": 0.945,
+      "p99_ms": 1.119,
+      "max_ms": 1.253
+    }
+  ]
+}

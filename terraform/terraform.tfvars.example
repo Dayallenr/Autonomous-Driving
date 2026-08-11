@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars (gitignored) and fill in before applying.
+# terraform.tfvars itself is never committed — only this example.
+
+github_repository = "Dayallenr/Autonomous-Driving"
+
+# Uncomment to override defaults (see variables.tf for what each one costs):
+# aws_region          = "us-east-1"
+# node_instance_type  = "t3.medium"
+# node_desired_size   = 2

@@ -1,0 +1,50 @@
+# One-shot: seeds the benchmark suite onto the queue, then exits. A Job
+# (restartPolicy: Never, run-to-completion) rather than a Deployment for the
+# same reason the worker Deployment needed --idle-timeout-seconds 0 — a
+# Deployment expects a long-running process, and this isn't one.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enqueue-episodes
+  namespace: pathfinder
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: enqueue
+          image: pathfinder-worker:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "scripts/enqueue_episodes.py"]
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              value: "test"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "test"
+            - name: EPISODES_TOTAL
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: episodes-total
+            - name: QUEUE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: queue-name
+            - name: QUEUE_ENDPOINT_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: queue-endpoint-url
+            - name: QUEUE_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: queue-region
+          args:
+            - "--count=$(EPISODES_TOTAL)"
+            - "--queue-backend=sqs"
+            - "--queue-name=$(QUEUE_NAME)"
+            - "--queue-endpoint-url=$(QUEUE_ENDPOINT_URL)"
+            - "--queue-region=$(QUEUE_REGION)"

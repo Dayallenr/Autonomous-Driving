@@ -1,0 +1,57 @@
+# Shared SQS queue for pods to pull work from — the same role it plays in
+# docker-compose.yml, for the same reason: separate worker Pods don't share
+# memory, so an in-process "local" queue can't cross Pod boundaries.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: pathfinder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+        - name: localstack
+          image: localstack/localstack:3
+          env:
+            - name: SERVICES
+              value: "sqs"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            # See docker-compose.yml for why this matters: without it,
+            # returned queue URLs use a public DNS name pods on this cluster
+            # can't resolve.
+            - name: SQS_ENDPOINT_STRATEGY
+              value: "path"
+          ports:
+            - containerPort: 4566
+          readinessProbe:
+            httpGet:
+              path: /_localstack/health
+              port: 4566
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /_localstack/health
+              port: 4566
+            initialDelaySeconds: 15
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+  namespace: pathfinder
+spec:
+  selector:
+    app: localstack
+  ports:
+    - port: 4566
+      targetPort: 4566

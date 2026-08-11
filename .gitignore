@@ -63,3 +63,14 @@ carla_logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Terraform — .terraform.lock.hcl is deliberately NOT ignored: Terraform
+# itself recommends committing it so provider version selection is
+# reproducible across machines.
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfplan
+terraform/tfplan
+terraform/*.tfvars
+!terraform/*.tfvars.example

@@ -1,0 +1,81 @@
+# Manual only — this workflow NEVER runs on push or PR (workflow_dispatch is
+# the only trigger), so a stray commit can never push an ECR image or touch
+# real AWS. See CLAUDE.md's zero-spend-by-default rule.
+#
+# Inert until Phase 7:
+#   - terraform/ doesn't exist yet — the terraform job has nothing to run.
+#   - Needs two repo Variables: AWS_DEPLOY_ROLE_ARN, AWS_REGION (an OIDC role
+#     Phase 7's Terraform provisions — no long-lived AWS keys in GitHub).
+#   - Needs the `aws-deploy` GitHub Environment configured with required
+#     reviewers (Settings -> Environments) for the approval gate to actually
+#     hold; without that, `environment:` below just labels the run.
+name: Deploy (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        required: true
+        type: choice
+        options: [push-images, terraform-plan, terraform-apply, terraform-destroy]
+
+permissions:
+  id-token: write # for OIDC AWS auth
+  contents: read
+
+jobs:
+  push-images:
+    if: inputs.action == 'push-images'
+    runs-on: ubuntu-latest
+    environment: aws-deploy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2.1.6
+        id: ecr
+      - uses: docker/setup-buildx-action@v3
+      - name: Build & push coordinator
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.coordinator
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/pathfinder-coordinator:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/pathfinder-coordinator:latest
+      - name: Build & push worker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/pathfinder-worker:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/pathfinder-worker:latest
+
+  terraform:
+    if: inputs.action != 'push-images'
+    runs-on: ubuntu-latest
+    environment: aws-deploy
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v4.0.1
+      - run: terraform init
+      - run: terraform plan -out=tfplan
+      - name: terraform apply
+        if: inputs.action == 'terraform-apply'
+        run: terraform apply -auto-approve tfplan
+      - name: terraform destroy
+        if: inputs.action == 'terraform-destroy'
+        run: terraform destroy -auto-approve

@@ -1,0 +1,44 @@
+# Run after the workers have drained the queue and flushed their telemetry
+# (see k8s/eks/deploy.sh — it waits for the queue to empty before applying
+# this) — drains the real Kinesis stream into real S3 Parquet. This is the
+# artifact worth capturing as evidence: `aws s3 ls` on the bucket afterward
+# proves the whole SQS -> gRPC -> Kinesis -> S3 path ran for real.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: archive-telemetry
+  namespace: pathfinder
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: pathfinder-worker
+      restartPolicy: Never
+      containers:
+        - name: archive
+          image: "${ECR_WORKER_IMAGE}"
+          imagePullPolicy: Always
+          command: ["python", "scripts/archive_telemetry.py"]
+          env:
+            - name: TELEMETRY_STREAM_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: telemetry-stream-name
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: s3-bucket
+            - name: AWS_REGION_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: aws-region
+          args:
+            - "--telemetry-backend=kinesis"
+            - "--telemetry-stream-name=$(TELEMETRY_STREAM_NAME)"
+            - "--telemetry-region=$(AWS_REGION_NAME)"
+            - "--object-backend=s3"
+            - "--bucket=$(S3_BUCKET)"
+            - "--object-region=$(AWS_REGION_NAME)"

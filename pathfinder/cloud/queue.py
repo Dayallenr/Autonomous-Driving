@@ -41,6 +41,7 @@ __all__ = [
     "MessageQueue",
     "SqsMessageQueue",
     "build_queue",
+    "ensure_queue",
 ]
 
 
@@ -283,6 +284,21 @@ class SqsMessageQueue(MessageQueue):
 
     def purge(self) -> None:
         self._client.purge_queue(QueueUrl=self.queue_url)
+
+
+def ensure_queue(name: str, *, endpoint_url: str | None = None, region: str = "us-east-1") -> str:
+    """Create the named SQS queue if it doesn't exist yet, and return its URL.
+
+    ``create_queue`` is idempotent — called again on a queue that already
+    exists (with the same attributes) it just returns that queue's URL. Meant
+    for LocalStack-based local/CI use, where nothing provisions the queue
+    ahead of time; real deployments provision queues via Terraform and pass an
+    explicit ``queue_url`` to :func:`build_queue` instead.
+    """
+    import boto3
+
+    client = boto3.client("sqs", endpoint_url=endpoint_url, region_name=region)
+    return client.create_queue(QueueName=name)["QueueUrl"]
 
 
 def build_queue(

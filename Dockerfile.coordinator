@@ -1,0 +1,19 @@
+# Coordinator: the gRPC control-plane server (pathfinder/rpc/server.py).
+# Deliberately minimal — see docker/requirements-coordinator.txt for why this
+# doesn't use the repo's main requirements.txt.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY docker/requirements-coordinator.txt .
+RUN pip install --no-cache-dir -r requirements-coordinator.txt
+
+COPY pathfinder/ pathfinder/
+
+RUN useradd --create-home --uid 1000 pathfinder
+USER pathfinder
+
+EXPOSE 50051
+
+ENTRYPOINT ["python", "-m", "pathfinder.rpc.server"]
+CMD ["--port", "50051"]

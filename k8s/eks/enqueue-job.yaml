@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enqueue-episodes
+  namespace: pathfinder
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: pathfinder-worker
+      restartPolicy: Never
+      containers:
+        - name: enqueue
+          image: "${ECR_WORKER_IMAGE}"
+          imagePullPolicy: Always
+          command: ["python", "scripts/enqueue_episodes.py"]
+          env:
+            - name: EPISODES_TOTAL
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: episodes-total
+            - name: SQS_QUEUE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: sqs-queue-url
+            - name: AWS_REGION_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: pathfinder-config
+                  key: aws-region
+          args:
+            - "--count=$(EPISODES_TOTAL)"
+            - "--queue-backend=sqs"
+            - "--queue-url=$(SQS_QUEUE_URL)"
+            - "--queue-region=$(AWS_REGION_NAME)"

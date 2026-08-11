@@ -1,0 +1,13 @@
+# Run configuration shared by the coordinator, the enqueue Job, and every
+# worker replica — one place to change the episode count or queue name
+# instead of editing three manifests.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pathfinder-config
+  namespace: pathfinder
+data:
+  episodes-total: "12"
+  queue-name: "pathfinder-episodes"
+  queue-endpoint-url: "http://localstack:4566"
+  queue-region: "us-east-1"

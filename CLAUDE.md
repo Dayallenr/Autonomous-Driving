@@ -183,6 +183,8 @@ pathfinder/
   data/       kitti.py — provenance, sequence-disjoint split, rebalancing
   detection/  evaluate.py — per-class reports with instance/image/drive support
   metrics/    detection.py (mAP) · driving_score.py (CARLA Leaderboard)
+  planning/   cil_model.py — 4-branch ResNet-18 CIL model (moved from
+              top-level planning/, which no longer exists)
   rpc/        coordinator.py + generated stubs — NO SERVER YET
   orchestration.py · runner.py · dagger.py · benchmark_detector.py
 scripts/      prepare_kitti.py · train_detector.py · eval_detector.py
@@ -191,11 +193,13 @@ docs/         DATA.md · SETUP_WINDOWS.md
 results/      data/ (figures) · perception/ (reports) · carla/probe.json
 ```
 
-**Legacy top-level packages** (`agent.py`, `perception/`, `localization/`,
-`prediction/`, `planning/`, `control/`, `sensors/`, `main.py`) are the original
-classical-ADS stack. `planning/cil_model.py` is still used. The rest is largely
-superseded by `pathfinder/` and should be either integrated or removed as part
-of Phase 9 cleanup — decide deliberately, don't just delete.
+**The legacy classical-ADS stack is gone.** `agent.py`, `perception/`,
+`localization/`, `prediction/`, `planning/` (top-level), `control/`,
+`sensors/`, and `main.py` were deleted — they were a closed loop that only
+imported each other, and `pathfinder/` had already superseded all of it.
+`planning/cil_model.py` was the one genuinely shared file; it now lives at
+`pathfinder/planning/cil_model.py`, and `pathfinder/dagger.py` plus the
+Colab notebook (`notebooks/train_cil_dagger.ipynb`) import it from there.
 
 ---
 
