@@ -62,13 +62,24 @@ from pathfinder.sim.route import RoutePoint, RouteTracker, road_option_to_comman
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["CARLA_CAMERA", "CarlaSimulator", "build_simulator", "carla_available"]
+__all__ = [
+    "CARLA_CAMERA",
+    "CarlaSimulator",
+    "build_simulator",
+    "carla_available",
+    "footprint_corners",
+    "forward_range_to_footprint",
+    "to_camera_frame",
+]
 
-#: The spawned camera's field of view and mounting height. Module-level so
-#: :data:`CARLA_CAMERA` below is derived from the same values the sensor is
-#: configured with, and the two cannot drift apart.
+#: The spawned camera's field of view, mounting height, and forward offset
+#: from the vehicle origin. Module-level so :data:`CARLA_CAMERA` below and the
+#: privileged range measurement in :meth:`CarlaSimulator._state` are derived
+#: from the same values the sensor is configured with, and the three cannot
+#: drift apart.
 CAMERA_FOV_DEGREES = 90.0
 CAMERA_MOUNT_HEIGHT_M = 2.4
+CAMERA_FORWARD_OFFSET_M = 1.5
 
 #: Geometry of this backend's camera, for inverting ground-plane projections
 #: (``range_from_box``). The image is the same 200x88 as the kinematic
@@ -82,6 +93,140 @@ CARLA_CAMERA = CameraGeometry(
     image_width_px=RENDER_WIDTH,
     image_height_px=RENDER_HEIGHT,
 )
+
+# ── Privileged range convention ─────────────────────────────────────────────
+# The functions below define what `nearest_object_m` *means* on this backend,
+# and they exist to keep the ablation honest (issue #10): the Detector arm
+# measures forward-only ground-plane range from the camera to an obstacle's
+# visible base, so the privileged arm must measure the same thing or the
+# ablation's delta partly measures convention rather than perception. They are
+# pure geometry — no CARLA types — so tests/test_range_convention.py can pin
+# them on any machine.
+
+
+def footprint_corners(
+    center_x: float,
+    center_y: float,
+    yaw_rad: float,
+    half_length_m: float,
+    half_width_m: float,
+) -> list[tuple[float, float]]:
+    """Ordered ground-plane corners of an oriented box footprint."""
+    cos_yaw, sin_yaw = math.cos(yaw_rad), math.sin(yaw_rad)
+    return [
+        (
+            center_x + forward * cos_yaw - lateral * sin_yaw,
+            center_y + forward * sin_yaw + lateral * cos_yaw,
+        )
+        for forward, lateral in (
+            (half_length_m, half_width_m),
+            (half_length_m, -half_width_m),
+            (-half_length_m, -half_width_m),
+            (-half_length_m, half_width_m),
+        )
+    ]
+
+
+def to_camera_frame(
+    points: list[tuple[float, float]],
+    camera_x: float,
+    camera_y: float,
+    camera_yaw_rad: float,
+) -> list[tuple[float, float]]:
+    """World ground-plane points into the camera's frame: x forward, y lateral."""
+    cos_yaw, sin_yaw = math.cos(camera_yaw_rad), math.sin(camera_yaw_rad)
+    return [
+        (
+            cos_yaw * (x - camera_x) + sin_yaw * (y - camera_y),
+            -sin_yaw * (x - camera_x) + cos_yaw * (y - camera_y),
+        )
+        for x, y in points
+    ]
+
+
+def _clip_to_wedge(
+    corners: list[tuple[float, float]], half_fov_rad: float
+) -> list[tuple[float, float]]:
+    """Sutherland–Hodgman clip of a convex polygon to the camera's FOV wedge.
+
+    The wedge has its apex at the origin and opens along +x; a point is inside
+    edge ``(sin h·x ∓ cos h·y) >= 0`` for the left/right frustum planes.
+    """
+    sin_h, cos_h = math.sin(half_fov_rad), math.cos(half_fov_rad)
+    # Points exactly on a frustum plane must count as visible, and rounding in
+    # sin/cos puts them a few ulps to either side; the tolerance is nanometres,
+    # far below anything a range in metres can resolve.
+    epsilon = 1e-9
+    polygon = corners
+    for plane_y_sign in (1.0, -1.0):
+        clipped: list[tuple[float, float]] = []
+        for index, point in enumerate(polygon):
+            previous = polygon[index - 1]
+            side = sin_h * point[0] - plane_y_sign * cos_h * point[1] + epsilon
+            previous_side = sin_h * previous[0] - plane_y_sign * cos_h * previous[1] + epsilon
+            if previous_side >= 0 and side >= 0:
+                clipped.append(point)
+            elif previous_side >= 0 or side >= 0:
+                # The edge crosses the plane; keep the intersection, plus the
+                # inside endpoint when entering.
+                t = previous_side / (previous_side - side)
+                clipped.append(
+                    (
+                        previous[0] + t * (point[0] - previous[0]),
+                        previous[1] + t * (point[1] - previous[1]),
+                    )
+                )
+                if side >= 0:
+                    clipped.append(point)
+        polygon = clipped
+        if not polygon:
+            return []
+    return polygon
+
+
+def forward_range_to_footprint(
+    corners: list[tuple[float, float]], half_fov_rad: float
+) -> float:
+    """Ground-plane range from the camera to a footprint's nearest visible point.
+
+    Args:
+        corners: Convex footprint polygon, ordered, in the camera frame
+            (origin at the camera's nadir, +x forward).
+        half_fov_rad: Half the camera's horizontal field of view; must be
+            below pi/2, which every pinhole camera's is.
+
+    Returns:
+        Distance in metres to the nearest point of the footprint that lies
+        inside the camera's FOV wedge — the same surface a detected box's
+        base edge measures — or ``math.inf`` when no part of the footprint
+        is visible. Zero when the camera origin is inside the footprint.
+    """
+    visible = _clip_to_wedge(corners, half_fov_rad)
+    if not visible:
+        return math.inf
+    if len(visible) >= 3:
+        # Inside a convex polygon (either winding): the origin is on one
+        # consistent side of every edge. The wedge apex sits at the origin, so
+        # a clipped polygon containing it means the camera is inside the
+        # obstacle's footprint.
+        sides = [
+            (b[0] - a[0]) * -a[1] - (b[1] - a[1]) * -a[0]
+            for a, b in zip(visible, visible[1:] + visible[:1], strict=True)
+        ]
+        if all(s >= 0 for s in sides) or all(s <= 0 for s in sides):
+            return 0.0
+    nearest = math.inf
+    for index, (bx, by) in enumerate(visible):
+        ax, ay = visible[index - 1]
+        edge_x, edge_y = bx - ax, by - ay
+        length_sq = edge_x * edge_x + edge_y * edge_y
+        if length_sq == 0.0:
+            nearest = min(nearest, math.hypot(ax, ay))
+            continue
+        t = max(0.0, min(1.0, (-ax * edge_x - ay * edge_y) / length_sq))
+        nearest = min(nearest, math.hypot(ax + t * edge_x, ay + t * edge_y))
+    return nearest
+
 
 _WEATHER_PRESETS = (
     "ClearNoon", "CloudyNoon", "WetNoon", "WetCloudyNoon",
@@ -102,6 +247,10 @@ STOPPED_SPEED_MPS = 0.1
 
 #: Range within which a traffic light is reported to the policy.
 TRAFFIC_LIGHT_RANGE_M = 30.0
+
+#: Range within which privileged perception reports obstacles. Matches the
+#: kinematic backend's 50 m sensing window.
+OBSTACLE_SENSING_RANGE_M = 50.0
 
 
 def carla_available() -> bool:
@@ -482,18 +631,40 @@ class CarlaSimulator(SimulatorBackend):
 
         tracking = self._route.update(transform.location.x, transform.location.y, yaw)
 
+        # Privileged range must share the Detector arm's measurement
+        # convention — forward frustum only, ground-plane distance from the
+        # camera's nadir to the obstacle's nearest visible surface — or the
+        # ablation's delta partly measures convention rather than perception
+        # (issue #10). 360-degree actor-origin distance is deliberately not
+        # what this reports.
         nearest = float("inf")
         detections = 0
-        ego_location = transform.location
+        half_fov_rad = math.radians(CAMERA_FOV_DEGREES / 2.0)
+        camera_x = transform.location.x + math.cos(yaw) * CAMERA_FORWARD_OFFSET_M
+        camera_y = transform.location.y + math.sin(yaw) * CAMERA_FORWARD_OFFSET_M
         for actor in list(self._world.get_actors().filter("*vehicle*")) + list(
             self._world.get_actors().filter("*walker*")
         ):
             if actor.id == self._vehicle.id:
                 continue
-            distance = ego_location.distance(actor.get_location())
-            if distance < 50.0:
+            actor_transform = actor.get_transform()
+            box = actor.bounding_box
+            actor_yaw = math.radians(actor_transform.rotation.yaw)
+            cos_a, sin_a = math.cos(actor_yaw), math.sin(actor_yaw)
+            # The bounding box is offset from the actor origin in the actor's
+            # frame (walkers in particular are not centred on their origin).
+            center_x = actor_transform.location.x + box.location.x * cos_a - box.location.y * sin_a
+            center_y = actor_transform.location.y + box.location.x * sin_a + box.location.y * cos_a
+            corners = to_camera_frame(
+                footprint_corners(center_x, center_y, actor_yaw, box.extent.x, box.extent.y),
+                camera_x,
+                camera_y,
+                yaw,
+            )
+            range_m = forward_range_to_footprint(corners, half_fov_rad)
+            if range_m < OBSTACLE_SENSING_RANGE_M:
                 detections += 1
-                nearest = min(nearest, distance)
+                nearest = min(nearest, range_m)
 
         light_state, light_distance = self._traffic_light_ahead()
 
