@@ -85,12 +85,68 @@ git push
 
 ## 6. CARLA (separate, whenever you get to it)
 
-Download the **CARLA 0.9.15 Windows** build from the
+Download the **CARLA 0.9.16 Windows** build from the
 [releases page](https://github.com/carla-simulator/carla/releases), unzip, and
-run `CarlaUE4.exe`. If a city loads and WASD moves the camera, it works. Then:
+run `CarlaUE4.exe`. If a city loads and WASD moves the camera, it works.
+
+The CARLA 0.9.16 wheels are **cp312-only**, so the CARLA venv is Python
+3.12 (this is the repo's `.venv` on the Windows machine — separate from any
+3.13 training venv):
 
 ```powershell
 pip install carla
+```
+
+Set `CARLA_ROOT` to the unzipped CARLA_0.9.16 folder so
+`pathfinder/sim/carla_paths.py` can find CARLA's `agents` package.
+
+## 7. Run the perception ablation on CARLA (issue #10)
+
+One sitting, unattended once started. Everything it needs is in the repo after
+`git pull` — the trained weights live at
+`results/perception/yolov8m/weights/best.pt` and are committed.
+
+```powershell
+git pull
+.\.venv\Scripts\Activate.ps1   # the CARLA venv, Python 3.12
+```
+
+Once per machine, put the Detector's dependencies into that same venv (they
+must coexist with `carla` in one process):
+
+```powershell
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+pip install ultralytics
+```
+
+Verify `sm_120` with the one-liner in step 3. Then start `CarlaUE4.exe`, wait
+for the town to load, and run:
+
+```powershell
+python -m pathfinder.ablation --backend carla --episodes 10 --device cuda
+```
+
+That is 20 episodes of simulation (10 per arm, identical seeds) across
+Town01/03/05 and four weathers. At the recorded 172–181 ticks/s
+(`results/carla/probe.json`) the privileged arm is minutes; the Detector arm
+runs YOLOv8m on every frame and dominates the wall-clock — budget an hour or
+two and let it run unattended. Every finished
+episode is checkpointed to `results/ablation/carla_report.partial.jsonl`, so a
+crash costs one episode of progress, not the run — but there is no resume:
+re-run the same command after fixing whatever crashed.
+
+It writes two artifacts:
+
+- `results/ablation/carla_report.json` — every number, spec, and seed
+- `results/ablation/carla_report.md` — the generated write-up (scope label,
+  perception boundary, infraction breakdown, fine-tuning-trigger verdict)
+
+Then push them back:
+
+```powershell
+git add results/ablation
+git commit -m "Run the GT-vs-Detector ablation on CARLA (#10)"
+git push
 ```
 
 ## Troubleshooting
