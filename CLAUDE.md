@@ -50,7 +50,12 @@ results exist only on another machine or in a chat message, they do not exist.
 5. **Tool honesty in write-ups.** SQS runs live, so "AWS SQS" is fair. The
    Kubernetes orchestration runs on kind, so say "Kubernetes, with EKS-ready
    Terraform" — not "deployed on EKS". SageMaker local mode is genuinely the
-   SageMaker SDK, but say it runs in local mode. Kinesis is currently cut.
+   SageMaker SDK, but say it runs in local mode. Kinesis is **not** cut:
+   `terraform/kinesis.tf` provisions an on-demand stream and
+   `KinesisTelemetryStream` is exercised against moto in
+   `tests/test_cloud_aws.py` — but no real stream has ever been created, so
+   say "Kinesis, never applied to real AWS". The default telemetry backend
+   is `LocalTelemetryStream`.
 
 6. **Resume bullets are deferred.** The user has said explicitly: do not spend
    effort reframing resume bullets. Focus on making the project as good as it
@@ -118,10 +123,11 @@ so its entire validation set is one drive (56 instances). Any AP for it is
 high-variance. Reports flag single-drive classes automatically.
 
 **CARLA 0.9.16 is bit-reproducible on the Windows machine.** Two runs of one
-seed gave 0.0 m divergence over 120 ticks, at **209 ticks/sec** — so 1,000
-episodes is roughly 2 hours single-threaded. This makes "replay any result
-bit-identically" a supportable claim, *provided* fixed delta, synchronous mode,
-and a seeded traffic manager are all set together.
+seed gave 0.0 m divergence over 120 ticks, at **172–181 ticks/sec**
+(`results/carla/probe.json`) — so 1,000 episodes is roughly 2.5 hours
+single-threaded. This makes "replay any result bit-identically" a supportable
+claim, *provided* fixed delta, synchronous mode, and a seeded traffic manager
+are all set together.
 
 ---
 
@@ -136,13 +142,13 @@ and a seeded traffic manager are all set together.
 | 3 CIL planner + DAgger | Not started — needs CARLA |
 | 4 GT-vs-YOLO ablation | Not started — needs CARLA |
 | 5 Distributed benchmark (SQS, telemetry, Parquet) | Queue/telemetry/warehouse code exists and is tested; needs real CARLA episodes and real AWS SQS |
-| 6 gRPC service | Servicer + proto exist; **no server binds a port**, no latency ever measured |
-| 7 Terraform / LocalStack / kind | Not started |
-| 8 CI/CD | Not started — no `.github/` |
+| 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
+| 7 Terraform / LocalStack / kind | **Written, never applied** — `terraform/` passes `fmt -check`, `init -backend=false`, `validate`, and `checkov` in CI; provisions EKS, ECR, SQS+DLQ, S3, **Kinesis**, KMS, IRSA, GitHub OIDC. `k8s/` carries kind manifests and an `eks/` overlay. Nothing has been applied to real AWS |
+| 8 CI/CD | **Done** — `.github/workflows/ci.yml` (ruff, pytest, hadolint, Docker build, trivy, compose validate, terraform validate + checkov) and `deploy.yml` (manual `workflow_dispatch` only) |
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-128 tests pass; `ruff check` clean.
+148 tests pass; `ruff check` clean.
 
 ---
 
@@ -185,12 +191,20 @@ pathfinder/
   metrics/    detection.py (mAP) · driving_score.py (CARLA Leaderboard)
   planning/   cil_model.py — 4-branch ResNet-18 CIL model (moved from
               top-level planning/, which no longer exists)
-  rpc/        coordinator.py + generated stubs — NO SERVER YET
+  rpc/        coordinator.py (servicer) · server.py (binds a port)
+              client.py · generated stubs
   orchestration.py · runner.py · dagger.py · benchmark_detector.py
 scripts/      prepare_kitti.py · train_detector.py · eval_detector.py
               plot_data_report.py · probe_carla.py · generate_protos.py
-docs/         DATA.md · SETUP_WINDOWS.md
+              bench_rpc_latency.py · run_worker.py · enqueue_episodes.py
+              archive_telemetry.py
+docs/         DATA.md · SETUP_WINDOWS.md · adr/ · agents/
+terraform/    EKS · ECR · SQS+DLQ · S3 · Kinesis · KMS · IRSA · OIDC
+              (validated, never applied)
+k8s/          kind manifests + eks/ overlay
+.github/      workflows/ci.yml · workflows/deploy.yml (manual only)
 results/      data/ (figures) · perception/ (reports) · carla/probe.json
+              rpc/latency_report.json
 ```
 
 **The legacy classical-ADS stack is gone.** `agent.py`, `perception/`,
@@ -216,3 +230,22 @@ Colab notebook (`notebooks/train_cil_dagger.ipynb`) import it from there.
   test expectation, a loop-variable closure, an off-by-2 curvature formula, an
   Ultralytics `project` path being resolved relative to `runs_dir`, and early
   stopping truncating a training schedule.
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues on `Dayallenr/Autonomous-Driving`, driven via the
+`gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary — `needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` and `docs/adr/` at the repo root. Both
+exist; they are extended by `/domain-modeling`. See `docs/agents/domain.md`.

@@ -15,6 +15,10 @@ COPY scripts/run_worker.py scripts/run_worker.py
 COPY scripts/enqueue_episodes.py scripts/enqueue_episodes.py
 
 RUN useradd --create-home --uid 1000 pathfinder
-USER pathfinder
+# Numeric, not "pathfinder": a username only resolves against this image's
+# /etc/passwd, so a host or orchestrator can't check the UID without running
+# the image (e.g. Kubernetes runAsNonRoot). hadolint DL3066. 1000 is the UID
+# created just above.
+USER 1000
 
 ENTRYPOINT ["python", "scripts/run_worker.py"]

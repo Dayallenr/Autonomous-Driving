@@ -2,10 +2,9 @@
 # the only trigger), so a stray commit can never push an ECR image or touch
 # real AWS. See CLAUDE.md's zero-spend-by-default rule.
 #
-# Inert until Phase 7:
-#   - terraform/ doesn't exist yet — the terraform job has nothing to run.
-#   - Needs two repo Variables: AWS_DEPLOY_ROLE_ARN, AWS_REGION (an OIDC role
-#     Phase 7's Terraform provisions — no long-lived AWS keys in GitHub).
+# Never yet run against real AWS. Before it can be:
+#   - Needs two repo Variables: AWS_DEPLOY_ROLE_ARN, AWS_REGION (the OIDC role
+#     `terraform/github-oidc.tf` provisions — no long-lived AWS keys in GitHub).
 #   - Needs the `aws-deploy` GitHub Environment configured with required
 #     reviewers (Settings -> Environments) for the approval gate to actually
 #     hold; without that, `environment:` below just labels the run.

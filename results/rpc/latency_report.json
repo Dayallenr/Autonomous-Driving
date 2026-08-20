@@ -5,38 +5,38 @@
     {
       "rpc": "RegisterWorker",
       "calls": 500,
-      "mean_ms": 0.27,
-      "p50_ms": 0.258,
-      "p95_ms": 0.313,
-      "p99_ms": 0.611,
-      "max_ms": 0.973
+      "mean_ms": 0.286,
+      "p50_ms": 0.261,
+      "p95_ms": 0.306,
+      "p99_ms": 0.587,
+      "max_ms": 8.672
     },
     {
       "rpc": "Heartbeat",
       "calls": 500,
-      "mean_ms": 0.262,
-      "p50_ms": 0.253,
-      "p95_ms": 0.284,
-      "p99_ms": 0.442,
-      "max_ms": 1.18
+      "mean_ms": 0.314,
+      "p50_ms": 0.259,
+      "p95_ms": 0.516,
+      "p99_ms": 1.27,
+      "max_ms": 3.757
     },
     {
       "rpc": "SubmitResult",
       "calls": 500,
-      "mean_ms": 0.263,
-      "p50_ms": 0.253,
-      "p95_ms": 0.296,
-      "p99_ms": 0.6,
-      "max_ms": 0.751
+      "mean_ms": 0.276,
+      "p50_ms": 0.262,
+      "p95_ms": 0.373,
+      "p99_ms": 0.624,
+      "max_ms": 0.918
     },
     {
       "rpc": "GetRunStatus",
       "calls": 500,
-      "mean_ms": 0.796,
-      "p50_ms": 0.779,
-      "p95_ms": 0.945,
-      "p99_ms": 1.119,
-      "max_ms": 1.253
+      "mean_ms": 0.852,
+      "p50_ms": 0.817,
+      "p95_ms": 1.009,
+      "p99_ms": 1.613,
+      "max_ms": 2.686
     }
   ]
 }

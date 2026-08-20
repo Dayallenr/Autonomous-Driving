@@ -2,6 +2,10 @@
 # lint it. Installed on top of requirements.txt.
 -r requirements.txt
 
+# Test runner. CI invokes `pytest` directly, so it has to be declared here
+# rather than assumed present in the developer's environment.
+pytest>=8.0.0
+
 # Linting
 ruff>=0.6.0
 
