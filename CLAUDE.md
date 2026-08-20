@@ -55,7 +55,10 @@ results exist only on another machine or in a chat message, they do not exist.
    `KinesisTelemetryStream` is exercised against moto in
    `tests/test_cloud_aws.py` — but no real stream has ever been created, so
    say "Kinesis, never applied to real AWS". The default telemetry backend
-   is `LocalTelemetryStream`.
+   is `LocalTelemetryStream`. The `carla_builtin_behavior_agent` Policy is
+   **CARLA's own behaviour agent, not project work** — never present its driving
+   score as this project's result; it is a reference upper bound only, and it
+   has never been run against a live server.
 
 6. **Resume bullets are deferred.** The user has said explicitly: do not spend
    effort reframing resume bullets. Focus on making the project as good as it
@@ -157,7 +160,7 @@ are all set together.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-193 tests pass; `ruff check` clean.
+215 tests pass; `ruff check` clean.
 
 ---
 
@@ -205,6 +208,9 @@ pathfinder/
               top-level planning/, which no longer exists)
   rpc/        coordinator.py (servicer) · server.py (binds a port)
               client.py · generated stubs
+  planners.py — build_planner(name) Policy registry; CarlaBehaviorAgentPlanner
+              wraps CARLA's own BehaviorAgent as the reference baseline,
+              registered as `carla_builtin_behavior_agent` (never run live)
   orchestration.py · runner.py · dagger.py · benchmark_detector.py
 scripts/      prepare_kitti.py · train_detector.py · eval_detector.py
               plot_data_report.py · probe_carla.py · generate_protos.py
