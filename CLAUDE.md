@@ -160,7 +160,7 @@ are all set together.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-223 tests pass; `ruff check` clean.
+229 tests pass; `ruff check` clean.
 
 ---
 

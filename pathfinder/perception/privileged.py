@@ -17,6 +17,11 @@ __all__ = ["PrivilegedPerception"]
 class PrivilegedPerception:
     """Forwards the frame's ground-truth obstacle fields, unchanged."""
 
+    #: Provenance identifier, carried into telemetry on every frame this
+    #: implementation produces. Matches ``ControlOutput``'s default: a Policy
+    #: with no perception seam reads the same ground truth this forwards.
+    NAME = "privileged"
+
     def perceive(self, state: FrameState) -> PerceivedScene:
         return PerceivedScene(
             nearest_object_m=state.nearest_object_m,
