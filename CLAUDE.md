@@ -122,6 +122,15 @@ reason — read the comment in `scripts/train_detector.py` before changing it.
 so its entire validation set is one drive (56 instances). Any AP for it is
 high-variance. Reports flag single-drive classes automatically.
 
+**Monocular range saturates in the near field.** `range_from_box` inverts the
+renderer's ground-plane projection, and below `min_measurable_range_m` (3.5 m on
+the kinematic camera) the obstacle's ground contact falls outside the frame. The
+detected box stops descending, so a vehicle at 2.5 m measures 3.58 m — it
+over-reads, which is the unsafe direction. The information is not in the image
+and no monocular method recovers it; the floor is exposed on `CameraGeometry`
+and pinned by `tests/test_range_geometry.py` so it cannot regress into a claim
+that the near field works.
+
 **CARLA 0.9.16 is bit-reproducible on the Windows machine.** Two runs of one
 seed gave 0.0 m divergence over 120 ticks, at **172–181 ticks/sec**
 (`results/carla/probe.json`) — so 1,000 episodes is roughly 2.5 hours
@@ -148,7 +157,7 @@ are all set together.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-148 tests pass; `ruff check` clean.
+193 tests pass; `ruff check` clean.
 
 ---
 
@@ -189,6 +198,9 @@ pathfinder/
   data/       kitti.py — provenance, sequence-disjoint split, rebalancing
   detection/  evaluate.py — per-class reports with instance/image/drive support
   metrics/    detection.py (mAP) · driving_score.py (CARLA Leaderboard)
+  perception/ geometry.py — monocular range from a detected box (pure geometry,
+              round-tripped against render.py's forward projection; saturates
+              below min_measurable_range_m)
   planning/   cil_model.py — 4-branch ResNet-18 CIL model (moved from
               top-level planning/, which no longer exists)
   rpc/        coordinator.py (servicer) · server.py (binds a port)
@@ -207,10 +219,11 @@ results/      data/ (figures) · perception/ (reports) · carla/probe.json
               rpc/latency_report.json
 ```
 
-**The legacy classical-ADS stack is gone.** `agent.py`, `perception/`,
-`localization/`, `prediction/`, `planning/` (top-level), `control/`,
-`sensors/`, and `main.py` were deleted — they were a closed loop that only
-imported each other, and `pathfinder/` had already superseded all of it.
+**The legacy classical-ADS stack is gone.** `agent.py`, top-level
+`perception/`, `localization/`, `prediction/`, top-level `planning/`,
+`control/`, `sensors/`, and `main.py` were deleted — they were a closed loop
+that only imported each other, and `pathfinder/` had already superseded all
+of it.
 `planning/cil_model.py` was the one genuinely shared file; it now lives at
 `pathfinder/planning/cil_model.py`, and `pathfinder/dagger.py` plus the
 Colab notebook (`notebooks/train_cil_dagger.ipynb`) import it from there.
