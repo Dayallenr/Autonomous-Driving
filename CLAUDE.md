@@ -160,7 +160,7 @@ are all set together.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-216 tests pass; `ruff check` clean.
+223 tests pass; `ruff check` clean.
 
 ---
 
@@ -201,15 +201,20 @@ pathfinder/
   data/       kitti.py — provenance, sequence-disjoint split, rebalancing
   detection/  evaluate.py — per-class reports with instance/image/drive support
   metrics/    detection.py (mAP) · driving_score.py (CARLA Leaderboard)
-  perception/ geometry.py — monocular range from a detected box (pure geometry,
-              round-tripped against render.py's forward projection; saturates
-              below min_measurable_range_m)
+  perception/ base.py (Perception protocol + PerceivedScene; documents what
+              stays privileged: localization + traffic lights) · privileged.py
+              (ground-truth passthrough, behaviour-preserving by
+              characterisation test) · geometry.py — monocular range from a
+              detected box (pure geometry, round-tripped against render.py's
+              forward projection; saturates below min_measurable_range_m)
   planning/   cil_model.py — 4-branch ResNet-18 CIL model (moved from
               top-level planning/, which no longer exists). The package keeps
               its name; ADR-0002 explains why the interface rename stopped here
   rpc/        coordinator.py (servicer) · server.py (binds a port)
               client.py · generated stubs
   policies.py — build_policy(name) registry for the `Policy` protocol;
+              ModularPolicy composes a Perception with an inner controller
+              (unregistered — the config surface comes with the ablation);
               CarlaBehaviorAgentPolicy wraps CARLA's own BehaviorAgent as the
               reference baseline, registered as `carla_builtin_behavior_agent`
               (never run against a live server)
