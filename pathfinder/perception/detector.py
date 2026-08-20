@@ -35,24 +35,26 @@ logger = logging.getLogger(__name__)
 __all__ = ["Detector", "DetectorPerception", "TRAINED_WEIGHTS", "YoloDetector", "load_yolo_model"]
 
 #: Where the honestly-trained YOLOv8m checkpoint lives in this repo (the
-#: sequence-disjoint split; mAP@0.5 = 0.475). Relative to the repo root, so it
-#: resolves on any machine that has pulled the weights.
-TRAINED_WEIGHTS = Path("results/perception/yolov8m/weights/best.pt")
+#: sequence-disjoint split; mAP@0.5 = 0.475). Anchored to this file, not the
+#: working directory, so a worker started from anywhere still finds it.
+TRAINED_WEIGHTS = (
+    Path(__file__).resolve().parents[2] / "results/perception/yolov8m/weights/best.pt"
+)
 
-#: One model per (weights, device) per process. Loading a YOLO checkpoint takes
-#: seconds and hundreds of megabytes; doing it per frame — or even per Episode —
-#: would dominate every latency figure and thrash memory.
+#: One loaded Detector per (weights, device) per process. Loading a checkpoint
+#: takes seconds and hundreds of megabytes; doing it per frame — or even per
+#: Episode — would dominate every latency figure and thrash memory.
 _MODEL_CACHE: dict[tuple[str, str], object] = {}
 
 
 def load_yolo_model(weights: str | Path, device: str):
     """Load an Ultralytics checkpoint once per process.
 
-    Repeated calls with the same weights and device return the *same* model
-    object — that identity is the public contract, and it is what makes "the
-    Detector is loaded once per process" checkable rather than hoped.
+    Repeated calls with the same weights and device return the *same* object —
+    that identity is the public contract, and it is what makes "the Detector is
+    loaded once per process" checkable rather than hoped.
 
-    The model comes back pinned to ``device`` and in evaluation mode. Set
+    The Detector comes back pinned to ``device`` and in evaluation mode. Set
     explicitly here instead of trusting ultralytics' predict path, because
     reproducibility of every downstream driving score rests on it.
 
@@ -171,9 +173,11 @@ class YoloDetector:
     def detect(self, image) -> list[Box]:
         import numpy as np
 
-        # FrameState images are RGB (both backends document this); ultralytics
-        # assumes ndarray input is BGR, so flip channels or every red car turns
-        # blue on the way into the Detector.
+        # ultralytics assumes ndarray input is BGR. The CARLA backend delivers
+        # RGB (it flips from CARLA's BGRA itself), so reverse the channels or
+        # every red car turns blue on the way into the Detector. The kinematic
+        # renderer's palette is deliberately channel-order-agnostic, so the
+        # flip is harmless there.
         bgr = np.ascontiguousarray(np.asarray(image)[..., ::-1])
         results = self._model.predict(
             bgr,
