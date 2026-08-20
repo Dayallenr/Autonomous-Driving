@@ -38,7 +38,7 @@ import time
 from collections.abc import Callable
 from dataclasses import replace
 
-from pathfinder.perception.base import Perception
+from pathfinder.perception.base import Perception, perception_name
 from pathfinder.runner import ControlOutput, Policy, PurePursuitPolicy
 from pathfinder.sim.base import FrameState
 from pathfinder.sim.carla_paths import ensure_agents_importable
@@ -55,8 +55,10 @@ __all__ = [
     "result_label",
 ]
 
-#: Registry name of the project's geometric controller.
-PURE_PURSUIT = "pure_pursuit"
+#: Registry name of the project's geometric controller. Taken from the class
+#: itself so telemetry stamped from an instance and results labelled from the
+#: registry can never use two names for one controller.
+PURE_PURSUIT = PurePursuitPolicy.NAME
 
 #: What every entry point selects when nothing is asked for.
 DEFAULT_POLICY = PURE_PURSUIT
@@ -196,10 +198,7 @@ class ModularPolicy:
         self._controller = controller
         # Provenance is read off the component itself rather than passed in, so
         # a frame can never be attributed to a perception that did not run.
-        # A Perception that declares no NAME is still identifiable by class.
-        self._perception_name = getattr(
-            perception, "NAME", type(perception).__name__
-        )
+        self._perception_name = perception_name(perception)
 
     def plan(self, state: FrameState) -> ControlOutput:
         perception_started = time.perf_counter()

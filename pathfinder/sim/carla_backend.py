@@ -47,6 +47,7 @@ import math
 import queue
 import random
 
+from pathfinder.perception.geometry import CameraGeometry
 from pathfinder.sim.base import (
     EpisodeSpec,
     FrameState,
@@ -61,7 +62,26 @@ from pathfinder.sim.route import RoutePoint, RouteTracker, road_option_to_comman
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["CarlaSimulator", "build_simulator", "carla_available"]
+__all__ = ["CARLA_CAMERA", "CarlaSimulator", "build_simulator", "carla_available"]
+
+#: The spawned camera's field of view and mounting height. Module-level so
+#: :data:`CARLA_CAMERA` below is derived from the same values the sensor is
+#: configured with, and the two cannot drift apart.
+CAMERA_FOV_DEGREES = 90.0
+CAMERA_MOUNT_HEIGHT_M = 2.4
+
+#: Geometry of this backend's camera, for inverting ground-plane projections
+#: (``range_from_box``). The image is the same 200x88 as the kinematic
+#: renderer, but the focal length differs (90-degree FOV, so half the image
+#: width) and the camera sits higher — a Detector arm run against CARLA frames
+#: must use this, not ``KINEMATIC_CAMERA``, or every range is scaled wrong.
+CARLA_CAMERA = CameraGeometry(
+    focal_px=RENDER_WIDTH / (2.0 * math.tan(math.radians(CAMERA_FOV_DEGREES) / 2.0)),
+    camera_height_m=CAMERA_MOUNT_HEIGHT_M,
+    principal_y_px=RENDER_HEIGHT / 2.0,
+    image_width_px=RENDER_WIDTH,
+    image_height_px=RENDER_HEIGHT,
+)
 
 _WEATHER_PRESETS = (
     "ClearNoon", "CloudyNoon", "WetNoon", "WetCloudyNoon",
@@ -293,10 +313,10 @@ class CarlaSimulator(SimulatorBackend):
             # backend sees the same geometry in the other.
             camera_bp.set_attribute("image_size_x", str(RENDER_WIDTH))
             camera_bp.set_attribute("image_size_y", str(RENDER_HEIGHT))
-            camera_bp.set_attribute("fov", "90")
+            camera_bp.set_attribute("fov", f"{CAMERA_FOV_DEGREES:g}")
             camera = self._world.spawn_actor(
                 camera_bp,
-                carla.Transform(carla.Location(x=1.5, z=2.4)),
+                carla.Transform(carla.Location(x=1.5, z=CAMERA_MOUNT_HEIGHT_M)),
                 attach_to=self._vehicle,
             )
             camera.listen(self._image_queue.put)
@@ -646,7 +666,7 @@ def build_simulator(backend: str = "auto", **kwargs) -> SimulatorBackend:
     """
     normalized = backend.strip().lower()
     if normalized == "kinematic":
-        return KinematicSimulator()
+        return KinematicSimulator(**kwargs)
     if normalized == "carla":
         if not carla_available():
             raise RuntimeError(
@@ -655,6 +675,15 @@ def build_simulator(backend: str = "auto", **kwargs) -> SimulatorBackend:
             )
         return CarlaSimulator(**kwargs)
     if normalized == "auto":
+        if kwargs:
+            # Backend kwargs are backend-specific (kinematic takes ``render``,
+            # CARLA takes ``render_camera``), so "auto" cannot forward them
+            # honestly: whichever backend the fallback picked would either
+            # reject them or silently drop them. Name the backend instead.
+            raise ValueError(
+                "backend='auto' cannot take backend-specific options "
+                f"({', '.join(sorted(kwargs))}); pass backend='kinematic' or 'carla'"
+            )
         if carla_available():
             try:
                 return CarlaSimulator(**kwargs)

@@ -152,7 +152,7 @@ are all set together.
 | 2 Perception | **Done** — YOLOv8m trained, evaluated, `results/perception/yolov8m/report.json` |
 | — CARLA backend rewrite | **Written, never executed against a live server** ← next |
 | 3 CIL Policy + DAgger | Not started — needs CARLA |
-| 4 GT-vs-YOLO ablation | Not started — needs CARLA |
+| 4 GT-vs-YOLO ablation | **Mechanism done** — `python -m pathfinder.ablation` runs both arms over identical seeded specs, records observed provenance per Episode, and labels kinematic reports pipeline-only (`results/ablation/kinematic_report.json`). The real number needs CARLA (#10) |
 | 5 Distributed benchmark (SQS, telemetry, Parquet) | Queue/telemetry/warehouse code exists and is tested; needs real CARLA episodes and real AWS SQS |
 | 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
 | 7 Terraform / LocalStack / kind | **Written, never applied** — `terraform/` passes `fmt -check`, `init -backend=false`, `validate`, and `checkov` in CI; provisions EKS, ECR, SQS+DLQ, S3, **Kinesis**, KMS, IRSA, GitHub OIDC. `k8s/` carries kind manifests and an `eks/` overlay. Nothing has been applied to real AWS |
@@ -160,7 +160,7 @@ are all set together.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-229 tests pass; `ruff check` clean.
+256 tests pass; `ruff check` clean.
 
 ---
 
@@ -216,11 +216,13 @@ pathfinder/
               client.py · generated stubs
   policies.py — build_policy(name) registry for the `Policy` protocol;
               ModularPolicy composes a Perception with an inner controller
-              (unregistered — the config surface comes with the ablation);
+              (unregistered — `pathfinder/ablation.py` composes it directly);
               CarlaBehaviorAgentPolicy wraps CARLA's own BehaviorAgent as the
               reference baseline, registered as `carla_builtin_behavior_agent`
               (never run against a live server)
   orchestration.py · runner.py · dagger.py · benchmark_detector.py
+  ablation.py — the GT-vs-Detector ablation: run_ablation() + CLI; provenance
+              observed from telemetry, kinematic reports labelled pipeline-only
 scripts/      prepare_kitti.py · train_detector.py · eval_detector.py
               plot_data_report.py · probe_carla.py · generate_protos.py
               bench_rpc_latency.py · run_worker.py · enqueue_episodes.py
@@ -232,7 +234,7 @@ terraform/    EKS · ECR · SQS+DLQ · S3 · Kinesis · KMS · IRSA · OIDC
 k8s/          kind manifests + eks/ overlay
 .github/      workflows/ci.yml · workflows/deploy.yml (manual only)
 results/      data/ (figures) · perception/ (reports) · carla/probe.json
-              rpc/latency_report.json
+              rpc/latency_report.json · ablation/ (pipeline-only kinematic report)
 ```
 
 **The legacy classical-ADS stack is gone.** `agent.py`, top-level
