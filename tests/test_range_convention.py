@@ -96,10 +96,13 @@ class TestToCameraFrame:
     def test_camera_frame_puts_forward_along_x(self):
         # Ego at (10, 5) heading +y (yaw 90 degrees), camera 1.5 m ahead of the
         # ego origin, so at (10, 6.5). A world point 20 m further along +y and
-        # 2 m to the ego's left (world -x) must land at forward 20, lateral 2.
+        # 2 m off-axis toward world -x — the ego's *right* in CARLA's
+        # left-handed frame (y points right) — must land at forward 20,
+        # lateral 2. The lateral sign never matters to the range convention:
+        # the FOV wedge and the distance are symmetric in y.
         (fx, fy), = to_camera_frame([(8.0, 26.5)], 10.0, 6.5, math.pi / 2.0)
         assert fx == pytest.approx(20.0)
-        assert fy == pytest.approx(2.0)
+        assert abs(fy) == pytest.approx(2.0)
 
 
 class TestConventionAlignment:

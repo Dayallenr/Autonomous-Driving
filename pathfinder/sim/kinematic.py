@@ -67,6 +67,10 @@ COLLISION_DISTANCE_M = 2.0
 # How far ahead traffic lights are perceivable.
 TRAFFIC_LIGHT_SENSING_M = 60.0
 
+# Range within which obstacles are reported in `detections`. The CARLA backend
+# imports this so the two backends' privileged sensing windows cannot drift.
+OBSTACLE_SENSING_RANGE_M = 50.0
+
 
 @dataclass
 class _Obstacle:
@@ -319,7 +323,7 @@ class KinematicSimulator(SimulatorBackend):
         visible = sum(
             1
             for obstacle in self._obstacles
-            if 0 <= obstacle.distance_along_route_m - self._distance <= 50
+            if 0 <= obstacle.distance_along_route_m - self._distance <= OBSTACLE_SENSING_RANGE_M
         )
         lateral, heading_error, curvature = self._tracking_errors()
         light_state, light_distance = self._next_light()
