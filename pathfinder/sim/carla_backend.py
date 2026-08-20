@@ -56,7 +56,7 @@ from pathfinder.sim.base import (
     StepResult,
 )
 from pathfinder.sim.carla_paths import ensure_agents_importable
-from pathfinder.sim.kinematic import KinematicSimulator
+from pathfinder.sim.kinematic import OBSTACLE_SENSING_RANGE_M, KinematicSimulator
 from pathfinder.sim.render import RENDER_HEIGHT, RENDER_WIDTH
 from pathfinder.sim.route import RoutePoint, RouteTracker, road_option_to_command
 
@@ -80,6 +80,7 @@ __all__ = [
 CAMERA_FOV_DEGREES = 90.0
 CAMERA_MOUNT_HEIGHT_M = 2.4
 CAMERA_FORWARD_OFFSET_M = 1.5
+_CAMERA_HALF_FOV_RAD = math.radians(CAMERA_FOV_DEGREES / 2.0)
 
 #: Geometry of this backend's camera, for inverting ground-plane projections
 #: (``range_from_box``). The image is the same 200x88 as the kinematic
@@ -247,10 +248,6 @@ STOPPED_SPEED_MPS = 0.1
 
 #: Range within which a traffic light is reported to the policy.
 TRAFFIC_LIGHT_RANGE_M = 30.0
-
-#: Range within which privileged perception reports obstacles. Matches the
-#: kinematic backend's 50 m sensing window.
-OBSTACLE_SENSING_RANGE_M = 50.0
 
 
 def carla_available() -> bool:
@@ -465,7 +462,9 @@ class CarlaSimulator(SimulatorBackend):
             camera_bp.set_attribute("fov", f"{CAMERA_FOV_DEGREES:g}")
             camera = self._world.spawn_actor(
                 camera_bp,
-                carla.Transform(carla.Location(x=1.5, z=CAMERA_MOUNT_HEIGHT_M)),
+                carla.Transform(
+                    carla.Location(x=CAMERA_FORWARD_OFFSET_M, z=CAMERA_MOUNT_HEIGHT_M)
+                ),
                 attach_to=self._vehicle,
             )
             camera.listen(self._image_queue.put)
@@ -639,7 +638,6 @@ class CarlaSimulator(SimulatorBackend):
         # what this reports.
         nearest = float("inf")
         detections = 0
-        half_fov_rad = math.radians(CAMERA_FOV_DEGREES / 2.0)
         camera_x = transform.location.x + math.cos(yaw) * CAMERA_FORWARD_OFFSET_M
         camera_y = transform.location.y + math.sin(yaw) * CAMERA_FORWARD_OFFSET_M
         for actor in list(self._world.get_actors().filter("*vehicle*")) + list(
@@ -661,7 +659,7 @@ class CarlaSimulator(SimulatorBackend):
                 camera_y,
                 yaw,
             )
-            range_m = forward_range_to_footprint(corners, half_fov_rad)
+            range_m = forward_range_to_footprint(corners, _CAMERA_HALF_FOV_RAD)
             if range_m < OBSTACLE_SENSING_RANGE_M:
                 detections += 1
                 nearest = min(nearest, range_m)
