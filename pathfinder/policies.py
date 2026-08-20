@@ -36,7 +36,9 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
+from dataclasses import replace
 
+from pathfinder.perception.base import Perception
 from pathfinder.runner import ControlOutput, Policy, PurePursuitPolicy
 from pathfinder.sim.base import FrameState
 from pathfinder.sim.carla_paths import ensure_agents_importable
@@ -48,6 +50,7 @@ __all__ = [
     "POLICY_NAMES",
     "PURE_PURSUIT",
     "CarlaBehaviorAgentPolicy",
+    "ModularPolicy",
     "build_policy",
     "result_label",
 ]
@@ -171,6 +174,35 @@ class CarlaBehaviorAgentPolicy:
                 self.NAME, vehicle.id, self._behavior,
             )
         return self._agent
+
+
+class ModularPolicy:
+    """ADR-0001's modular architecture, realised: perception feeding control.
+
+    Composes a :class:`~pathfinder.perception.base.Perception` with an inner
+    controller Policy, and satisfies the ``Policy`` protocol itself — so the
+    episode runner drives it exactly as it drives anything else, and the seam
+    count stays at one.
+
+    :meth:`plan` perceives the frame, then hands the controller a copy of the
+    frame whose obstacle fields are what perception reported rather than what
+    the simulator knows. Only those two fields cross the seam; localization
+    and traffic-light state pass through privileged, for the reasons recorded
+    in ``pathfinder/perception/base.py``.
+    """
+
+    def __init__(self, perception: Perception, controller: Policy) -> None:
+        self._perception = perception
+        self._controller = controller
+
+    def plan(self, state: FrameState) -> ControlOutput:
+        scene = self._perception.perceive(state)
+        perceived = replace(
+            state,
+            nearest_object_m=scene.nearest_object_m,
+            detections=scene.detections,
+        )
+        return self._controller.plan(perceived)
 
 
 def _build_pure_pursuit(simulator, **kwargs) -> Policy:
