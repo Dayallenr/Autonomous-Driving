@@ -113,10 +113,16 @@ class LocalObjectStore(ObjectStore):
         search_root = base if base.is_dir() else base.parent
         if not search_root.exists():
             return []
+        # as_posix(), not str(): object-store keys are '/'-separated on every
+        # platform, and str() yields backslashes on Windows. That made every
+        # startswith(prefix) comparison fail against a '/'-separated prefix, so
+        # list() returned nothing locally while the S3 backend returned the
+        # objects — the two implementations of one interface disagreeing only on
+        # Windows.
         return sorted(
-            str(path.relative_to(self.root))
+            path.relative_to(self.root).as_posix()
             for path in search_root.rglob("*")
-            if path.is_file() and str(path.relative_to(self.root)).startswith(prefix)
+            if path.is_file() and path.relative_to(self.root).as_posix().startswith(prefix)
         )
 
     def uri_for(self, key: str) -> str:
