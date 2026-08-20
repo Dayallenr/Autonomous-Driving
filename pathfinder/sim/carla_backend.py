@@ -246,6 +246,12 @@ ROUTE_RESOLUTION_M = 2.0
 BLOCKED_TIMEOUT_S = 30.0
 STOPPED_SPEED_MPS = 0.1
 
+#: Seconds a collision with one actor is remembered before a further contact
+#: with that same actor counts as a new collision. Matches the CARLA
+#: Leaderboard's ``CollisionTest.MAX_ID_TIME``, which exists because the
+#: collision sensor re-fires every tick while contact persists.
+COLLISION_COOLDOWN_S = 5.0
+
 #: Range within which a traffic light is reported to the policy.
 TRAFFIC_LIGHT_RANGE_M = 30.0
 
@@ -302,10 +308,32 @@ class CarlaSimulator(SimulatorBackend):
         self._stopped_seconds = 0.0
         self._latest_image = None
         self._was_at_red = False
+        self._collision_seen: dict[object, float] = {}
 
     @property
     def name(self) -> str:
         return "carla"
+
+    def _register_collision(self, key: object, now: float) -> bool:
+        """Whether a collision with ``key`` at time ``now`` is a new event.
+
+        CARLA's collision sensor re-fires every tick for as long as contact
+        persists, so a car resting against another produces hundreds of events
+        for one collision. Scored multiplicatively (0.60 per vehicle collision)
+        that drives any episode with sustained contact to exactly 0.0 and turns
+        "collisions per km" into a count of sensor callbacks — a 1,500-step
+        episode measured 475 "collisions" against a single vehicle.
+
+        The CARLA Leaderboard's ``CollisionTest`` handles this by remembering
+        the last collision per actor for ``MAX_ID_TIME`` seconds and ignoring
+        repeats inside that window. This mirrors that rule, which is also what
+        makes the count comparable to published Leaderboard numbers.
+        """
+        last = self._collision_seen.get(key)
+        if last is not None and now - last < COLLISION_COOLDOWN_S:
+            return False
+        self._collision_seen[key] = now
+        return True
 
     @property
     def vehicle(self):
@@ -535,7 +563,14 @@ class CarlaSimulator(SimulatorBackend):
     # ── sensor callbacks ─────────────────────────────────────────────────────
 
     def _on_collision(self, event) -> None:
-        type_id = getattr(getattr(event, "other_actor", None), "type_id", "") or ""
+        other = getattr(event, "other_actor", None)
+        type_id = getattr(other, "type_id", "") or ""
+        # Debounce sustained contact into one event per actor — see
+        # _register_collision. Keyed on the actor id where there is one; static
+        # geometry can arrive with id 0, where the type_id is the best
+        # available identity.
+        if not self._register_collision(getattr(other, "id", 0) or type_id, self._time):
+            return
         if type_id.startswith("walker"):
             self._pending.append(Infraction.COLLISION_PEDESTRIAN)
         elif type_id.startswith("vehicle"):
@@ -590,6 +625,9 @@ class CarlaSimulator(SimulatorBackend):
         self._pending = []
         self._latest_image = None
         self._was_at_red = False
+        # Per-episode: a collision registry carried across episodes would
+        # suppress the first collision of the next one.
+        self._collision_seen = {}
         self._last_location = self._vehicle.get_location()
 
         self._world.tick()

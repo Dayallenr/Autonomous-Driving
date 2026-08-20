@@ -1,0 +1,669 @@
+{
+  "kind": "perception_ablation",
+  "generated_at": "2026-08-20T23:32:11+00:00",
+  "backend": "carla",
+  "scope": "driving-quality",
+  "scope_note": "Generated on the CARLA backend: scores measure driving quality under the stated perception boundary (perceived obstacles, privileged localization and traffic lights).",
+  "perception_boundary": "perceived obstacles, privileged localization and traffic lights",
+  "controller": "pure_pursuit",
+  "episodes": [
+    {
+      "episode_id": "ep-0000",
+      "town": "Town01",
+      "weather": "ClearNoon",
+      "route_length_m": 400.0,
+      "seed": 1000,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0001",
+      "town": "Town03",
+      "weather": "ClearSunset",
+      "route_length_m": 400.0,
+      "seed": 1001,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0002",
+      "town": "Town05",
+      "weather": "HardRainNoon",
+      "route_length_m": 400.0,
+      "seed": 1002,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0003",
+      "town": "Town01",
+      "weather": "WetNoon",
+      "route_length_m": 400.0,
+      "seed": 1003,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0004",
+      "town": "Town03",
+      "weather": "ClearNoon",
+      "route_length_m": 400.0,
+      "seed": 1004,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0005",
+      "town": "Town05",
+      "weather": "ClearSunset",
+      "route_length_m": 400.0,
+      "seed": 1005,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0006",
+      "town": "Town01",
+      "weather": "HardRainNoon",
+      "route_length_m": 400.0,
+      "seed": 1006,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0007",
+      "town": "Town03",
+      "weather": "WetNoon",
+      "route_length_m": 400.0,
+      "seed": 1007,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0008",
+      "town": "Town05",
+      "weather": "ClearNoon",
+      "route_length_m": 400.0,
+      "seed": 1008,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0009",
+      "town": "Town01",
+      "weather": "ClearSunset",
+      "route_length_m": 400.0,
+      "seed": 1009,
+      "max_steps": 1500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    }
+  ],
+  "baseline": {
+    "perception": "privileged",
+    "summary": {
+      "episodes": 10,
+      "driving_score": 25.2,
+      "route_completion": 0.3961,
+      "infraction_penalty": 0.7448,
+      "collisions_per_km": 2.525,
+      "total_distance_km": 1.58,
+      "mean_fps": 35.1,
+      "failures": 0,
+      "infraction_totals": {
+        "red_light": 8,
+        "lane_invasion": 16,
+        "collision_static": 4,
+        "agent_blocked": 2
+      }
+    },
+    "mean_perception_latency_ms": 0.004,
+    "episodes": [
+      {
+        "perception": "privileged",
+        "seed": 1000,
+        "episode_id": "ep-0000",
+        "route_completion": 0.613,
+        "infraction_penalty": 0.7,
+        "driving_score": 42.91,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 1,
+        "infractions": {
+          "red_light": 1
+        },
+        "distance_travelled_m": 245.2,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 42.89,
+        "mean_fps": 35.0,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1001,
+        "episode_id": "ep-0001",
+        "route_completion": 0.3438,
+        "infraction_penalty": 1.0,
+        "driving_score": 34.38,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {},
+        "distance_travelled_m": 137.5,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 42.07,
+        "mean_fps": 35.7,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1002,
+        "episode_id": "ep-0002",
+        "route_completion": 0.4713,
+        "infraction_penalty": 1.0,
+        "driving_score": 47.13,
+        "collisions": 0,
+        "lane_invasions": 2,
+        "red_lights_run": 0,
+        "infractions": {
+          "lane_invasion": 2
+        },
+        "distance_travelled_m": 188.5,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 47.23,
+        "mean_fps": 31.8,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1003,
+        "episode_id": "ep-0003",
+        "route_completion": 0.6167,
+        "infraction_penalty": 0.1561,
+        "driving_score": 9.63,
+        "collisions": 1,
+        "lane_invasions": 0,
+        "red_lights_run": 4,
+        "infractions": {
+          "red_light": 4,
+          "collision_static": 1
+        },
+        "distance_travelled_m": 246.7,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 38.48,
+        "mean_fps": 39.0,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1004,
+        "episode_id": "ep-0004",
+        "route_completion": 0.6469,
+        "infraction_penalty": 0.1922,
+        "driving_score": 12.44,
+        "collisions": 3,
+        "lane_invasions": 6,
+        "red_lights_run": 1,
+        "infractions": {
+          "lane_invasion": 6,
+          "red_light": 1,
+          "collision_static": 3
+        },
+        "distance_travelled_m": 258.8,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 42.13,
+        "mean_fps": 35.6,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1005,
+        "episode_id": "ep-0005",
+        "route_completion": 0.4038,
+        "infraction_penalty": 0.7,
+        "driving_score": 28.26,
+        "collisions": 0,
+        "lane_invasions": 4,
+        "red_lights_run": 1,
+        "infractions": {
+          "red_light": 1,
+          "lane_invasion": 4,
+          "agent_blocked": 1
+        },
+        "distance_travelled_m": 161.5,
+        "route_length_m": 400.0,
+        "frames": 1482,
+        "duration_seconds": 45.11,
+        "mean_fps": 32.9,
+        "status": "completed",
+        "termination_reason": "agent blocked"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1006,
+        "episode_id": "ep-0006",
+        "route_completion": 0.052,
+        "infraction_penalty": 1.0,
+        "driving_score": 5.2,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {
+          "agent_blocked": 1
+        },
+        "distance_travelled_m": 20.8,
+        "route_length_m": 400.0,
+        "frames": 1155,
+        "duration_seconds": 30.66,
+        "mean_fps": 37.7,
+        "status": "completed",
+        "termination_reason": "agent blocked"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1007,
+        "episode_id": "ep-0007",
+        "route_completion": 0.3099,
+        "infraction_penalty": 0.7,
+        "driving_score": 21.69,
+        "collisions": 0,
+        "lane_invasions": 3,
+        "red_lights_run": 1,
+        "infractions": {
+          "lane_invasion": 3,
+          "red_light": 1
+        },
+        "distance_travelled_m": 123.9,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 41.3,
+        "mean_fps": 36.3,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1008,
+        "episode_id": "ep-0008",
+        "route_completion": 0.1428,
+        "infraction_penalty": 1.0,
+        "driving_score": 14.28,
+        "collisions": 0,
+        "lane_invasions": 1,
+        "red_lights_run": 0,
+        "infractions": {
+          "lane_invasion": 1
+        },
+        "distance_travelled_m": 57.1,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 48.81,
+        "mean_fps": 30.7,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1009,
+        "episode_id": "ep-0009",
+        "route_completion": 0.3604,
+        "infraction_penalty": 1.0,
+        "driving_score": 36.04,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {},
+        "distance_travelled_m": 144.1,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 38.21,
+        "mean_fps": 39.3,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      }
+    ]
+  },
+  "candidate": {
+    "perception": "detector",
+    "summary": {
+      "episodes": 10,
+      "driving_score": 8.86,
+      "route_completion": 0.4812,
+      "infraction_penalty": 0.1413,
+      "collisions_per_km": 26.498,
+      "total_distance_km": 1.92,
+      "mean_fps": 27.2,
+      "failures": 0,
+      "infraction_totals": {
+        "collision_vehicle": 47,
+        "lane_invasion": 42,
+        "red_light": 8,
+        "collision_static": 4,
+        "agent_blocked": 1
+      }
+    },
+    "mean_perception_latency_ms": 8.351,
+    "episodes": [
+      {
+        "perception": "detector",
+        "seed": 1000,
+        "episode_id": "ep-0000",
+        "route_completion": 0.7238,
+        "infraction_penalty": 0.0467,
+        "driving_score": 3.38,
+        "collisions": 6,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {
+          "collision_vehicle": 6
+        },
+        "distance_travelled_m": 289.5,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 49.0,
+        "mean_fps": 30.6,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1001,
+        "episode_id": "ep-0001",
+        "route_completion": 0.3995,
+        "infraction_penalty": 0.216,
+        "driving_score": 8.63,
+        "collisions": 3,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {
+          "collision_vehicle": 3
+        },
+        "distance_travelled_m": 159.8,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 58.58,
+        "mean_fps": 25.6,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1002,
+        "episode_id": "ep-0002",
+        "route_completion": 0.6206,
+        "infraction_penalty": 0.1296,
+        "driving_score": 8.04,
+        "collisions": 4,
+        "lane_invasions": 2,
+        "red_lights_run": 0,
+        "infractions": {
+          "lane_invasion": 2,
+          "collision_vehicle": 4
+        },
+        "distance_travelled_m": 248.2,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 60.07,
+        "mean_fps": 25.0,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1003,
+        "episode_id": "ep-0003",
+        "route_completion": 0.373,
+        "infraction_penalty": 0.0096,
+        "driving_score": 0.36,
+        "collisions": 7,
+        "lane_invasions": 0,
+        "red_lights_run": 3,
+        "infractions": {
+          "red_light": 3,
+          "collision_vehicle": 7
+        },
+        "distance_travelled_m": 149.2,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 50.85,
+        "mean_fps": 29.5,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1004,
+        "episode_id": "ep-0004",
+        "route_completion": 0.6463,
+        "infraction_penalty": 0.1922,
+        "driving_score": 12.42,
+        "collisions": 3,
+        "lane_invasions": 5,
+        "red_lights_run": 1,
+        "infractions": {
+          "lane_invasion": 5,
+          "red_light": 1,
+          "collision_static": 3
+        },
+        "distance_travelled_m": 258.5,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 57.46,
+        "mean_fps": 26.1,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1005,
+        "episode_id": "ep-0005",
+        "route_completion": 0.4121,
+        "infraction_penalty": 0.0327,
+        "driving_score": 1.35,
+        "collisions": 6,
+        "lane_invasions": 4,
+        "red_lights_run": 1,
+        "infractions": {
+          "red_light": 1,
+          "lane_invasion": 4,
+          "collision_vehicle": 6,
+          "agent_blocked": 1
+        },
+        "distance_travelled_m": 164.9,
+        "route_length_m": 400.0,
+        "frames": 1369,
+        "duration_seconds": 53.55,
+        "mean_fps": 25.6,
+        "status": "completed",
+        "termination_reason": "agent blocked"
+      },
+      {
+        "perception": "detector",
+        "seed": 1006,
+        "episode_id": "ep-0006",
+        "route_completion": 0.1454,
+        "infraction_penalty": 0.0354,
+        "driving_score": 0.51,
+        "collisions": 6,
+        "lane_invasions": 0,
+        "red_lights_run": 1,
+        "infractions": {
+          "collision_vehicle": 5,
+          "collision_static": 1,
+          "red_light": 1
+        },
+        "distance_travelled_m": 58.2,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 50.78,
+        "mean_fps": 29.5,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1007,
+        "episode_id": "ep-0007",
+        "route_completion": 0.7523,
+        "infraction_penalty": 0.7,
+        "driving_score": 52.66,
+        "collisions": 0,
+        "lane_invasions": 29,
+        "red_lights_run": 1,
+        "infractions": {
+          "red_light": 1,
+          "lane_invasion": 29
+        },
+        "distance_travelled_m": 300.9,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 54.59,
+        "mean_fps": 27.5,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1008,
+        "episode_id": "ep-0008",
+        "route_completion": 0.2083,
+        "infraction_penalty": 0.0467,
+        "driving_score": 0.97,
+        "collisions": 6,
+        "lane_invasions": 2,
+        "red_lights_run": 0,
+        "infractions": {
+          "collision_vehicle": 6,
+          "lane_invasion": 2
+        },
+        "distance_travelled_m": 83.3,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 60.26,
+        "mean_fps": 24.9,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1009,
+        "episode_id": "ep-0009",
+        "route_completion": 0.5301,
+        "infraction_penalty": 0.0042,
+        "driving_score": 0.22,
+        "collisions": 10,
+        "lane_invasions": 0,
+        "red_lights_run": 1,
+        "infractions": {
+          "collision_vehicle": 10,
+          "red_light": 1
+        },
+        "distance_travelled_m": 212.1,
+        "route_length_m": 400.0,
+        "frames": 1500,
+        "duration_seconds": 51.26,
+        "mean_fps": 29.3,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      }
+    ]
+  },
+  "difference": {
+    "definition": "baseline minus candidate, in each metric's own units; positive means the candidate's perception cost driving performance. Deltas for episodes listed in failed_episodes measure a mid-run failure, not perception, and must be excluded from any perception-cost claim.",
+    "failed_episodes": [],
+    "driving_score": 16.34,
+    "route_completion": -0.0851,
+    "infraction_penalty": 0.6035,
+    "per_episode_driving_score": [
+      {
+        "episode_id": "ep-0000",
+        "baseline": 42.91,
+        "candidate": 3.38,
+        "delta": 39.53
+      },
+      {
+        "episode_id": "ep-0001",
+        "baseline": 34.38,
+        "candidate": 8.63,
+        "delta": 25.76
+      },
+      {
+        "episode_id": "ep-0002",
+        "baseline": 47.13,
+        "candidate": 8.04,
+        "delta": 39.08
+      },
+      {
+        "episode_id": "ep-0003",
+        "baseline": 9.63,
+        "candidate": 0.36,
+        "delta": 9.27
+      },
+      {
+        "episode_id": "ep-0004",
+        "baseline": 12.44,
+        "candidate": 12.42,
+        "delta": 0.01
+      },
+      {
+        "episode_id": "ep-0005",
+        "baseline": 28.26,
+        "candidate": 1.35,
+        "delta": 26.92
+      },
+      {
+        "episode_id": "ep-0006",
+        "baseline": 5.2,
+        "candidate": 0.51,
+        "delta": 4.68
+      },
+      {
+        "episode_id": "ep-0007",
+        "baseline": 21.69,
+        "candidate": 52.66,
+        "delta": -30.97
+      },
+      {
+        "episode_id": "ep-0008",
+        "baseline": 14.28,
+        "candidate": 0.97,
+        "delta": 13.31
+      },
+      {
+        "episode_id": "ep-0009",
+        "baseline": 36.04,
+        "candidate": 0.22,
+        "delta": 35.81
+      }
+    ]
+  }
+}

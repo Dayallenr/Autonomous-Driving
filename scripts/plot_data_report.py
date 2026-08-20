@@ -310,7 +310,7 @@ def main() -> int:
         )
         return 1
 
-    manifest = json.loads(arguments.manifest.read_text())
+    manifest = json.loads(arguments.manifest.read_text(encoding="utf-8"))
     if "baseline_random_split" not in manifest:
         print(
             "manifest has no baseline measurement; "
