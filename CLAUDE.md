@@ -138,8 +138,43 @@ that the near field works.
 seed gave 0.0 m divergence over 120 ticks, at **172–181 ticks/sec**
 (`results/carla/probe.json`) — so 1,000 episodes is roughly 2.5 hours
 single-threaded. This makes "replay any result bit-identically" a supportable
-claim, *provided* fixed delta, synchronous mode, and a seeded traffic manager
-are all set together.
+claim, *provided* fixed delta, synchronous mode, a seeded traffic manager, **and
+`world.set_pedestrians_seed()`** are all set together. That last one is not
+optional and is easy to miss: walker navigation draws from a CARLA-internal RNG
+that neither the episode's `Random` nor the traffic manager's seed reaches, and
+that `load_world()` does not reset. Without it, two runs of one seed diverged
+over a 1,792-tick episode (different walker counts, different infractions,
+different end position); with it they are identical to six decimals. Verified
+over full episodes with traffic and pedestrians, not just the 120-tick probe.
+
+**Three route-geometry bugs were found by running the CARLA backend for real**
+(issue #5), all silent — the car still drove, the numbers still looked like
+numbers:
+
+1. `RouteTracker._signed_lateral_error` computed a lane-heading fallback for
+   zero-length segments and then discarded it, recomputing the raw (~0) deltas
+   in the return statement. Cross-track error pinned to ~0 forever.
+2. `_curvature_at` read a coincident neighbour's `atan2(0, 0)` as a heading of
+   zero, so it returned the *absolute* heading as a curvature — reaching ±pi.
+   At the default curvature gain of 8 that saturates steering to full lock and
+   pins the speed governor at its 0.35 floor. This alone held route completion
+   at 8%; fixing it took the same episode to 47%.
+3. `scripts/validate_carla_backend.py` used a hand-rolled controller that
+   omitted the negation `PurePursuitPolicy` applies to both error terms,
+   turning the steering into positive feedback. It now uses the real policy.
+
+The common trigger for (1) and (2): **CARLA's `GlobalRoutePlanner` emits exact
+duplicate waypoints at junctions.** Any new route geometry must tolerate
+coincident points. All three are pinned by pure-geometry tests in
+`tests/test_route.py` that run without CARLA.
+
+**"All four navigation branches in one episode" is not a backend property.**
+Town05 at seed 42 plans a 351 m route containing no `STRAIGHT` manoeuvre at all,
+so no amount of correct driving would surface `GO_STRAIGHT`. What is actually
+checkable — and what `validate_carla_backend.py` now checks — is that the
+planner plus `road_option_to_command` produce all four branches across a sample
+of routes (they do: 27 routes, all six real `RoadOption` names encountered), and
+that a driven episode only ever surfaces commands its own route planned.
 
 ---
 
@@ -150,7 +185,7 @@ are all set together.
 | 0 Audit | Done |
 | 1 KITTI data pipeline | **Done** — sequence-disjoint split, reproducible on Mac + Windows |
 | 2 Perception | **Done** — YOLOv8m trained, evaluated, `results/perception/yolov8m/report.json` |
-| — CARLA backend rewrite | **Written, never executed against a live server** ← next |
+| — CARLA backend rewrite | **Validated against a live server** (2026-08-20) — `scripts/validate_carla_backend.py` passes every issue #5 criterion and writes `results/carla/backend_validation.json`. Three real bugs were found and fixed by running it; see "Established findings". The ego completes **47% of a 351 m Town05 route** before `agent_blocked`, which is a driving-quality ceiling of `PurePursuitPolicy` in CARLA, **not** a backend defect — no learned policy has driven this backend yet |
 | 3 CIL Policy + DAgger | Not started — needs CARLA |
 | 4 GT-vs-YOLO ablation | **Mechanism done** — `python -m pathfinder.ablation` runs both arms over identical seeded specs, records observed provenance per Episode, and labels kinematic reports pipeline-only (`results/ablation/kinematic_report.json`). The measurement bias #10 recorded is addressed: the CARLA privileged arm is written to measure forward-frustum, camera-origin, ground-plane range to the obstacle's nearest visible surface — the same convention the Detector arm inverts. The convention geometry is pinned by `tests/test_range_convention.py`; the CARLA wiring around it (bounding-box offsets, actor filtering) is part of the unvalidated backend and gets exercised by #5's validation run. The real number needs CARLA (#10) |
 | 5 Distributed benchmark (SQS, telemetry, Parquet) | Queue/telemetry/warehouse code exists and is tested; needs real CARLA episodes and real AWS SQS |
@@ -160,31 +195,27 @@ are all set together.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-256 tests pass; `ruff check` clean.
+269 tests pass, 1 skipped; `ruff check` clean.
 
 ---
 
 ## Immediate next step
 
-`pathfinder/sim/carla_backend.py` was just rewritten and **has never run against
-a live CARLA server.** The previous version was a skeleton missing traffic,
-camera, routes, navigation commands, traffic-light infractions, and world reuse.
-All six are now implemented but unverified.
+The CARLA backend is validated (issue #5, above). Phase 3 — CIL Policy + DAgger —
+is unblocked.
 
-Validate it on the Windows machine before building anything on top:
+Before building on it, note the one open question the validation surfaced:
+**`PurePursuitPolicy` only completes 47% of a 351 m Town05 route**, ending
+`agent_blocked` after a `collision_static`. The backend reports this honestly;
+the geometric baseline simply is not a good enough driver in CARLA's dense
+traffic. That matters because the baseline is what the CIL policy gets compared
+against — a weak baseline makes a learned policy look better than it is. Worth
+deciding whether to tune it or to state its ceiling plainly in the write-up.
 
-1. Start `CarlaUE4.exe`.
-2. Run a short routed episode via `build_simulator("carla")` and confirm:
-   route completion advances monotonically, `command` varies across all four
-   branches (not stuck on `FOLLOW_LANE`), `state.image` is a 88×200×3 array,
-   traffic and pedestrians spawn, collisions and red lights register, and
-   teardown restores async mode.
-3. Re-run one seed twice and confirm identical results.
-
-Expect bugs — this is 400 lines written blind against an API that could not be
-tested locally. Fix them against the real server, and add regression tests to
-`tests/test_route.py` (pure geometry, runs anywhere) rather than to CARLA-only
-paths.
+Environment note: the CARLA 0.9.16 wheels are **cp312 only**, so `.venv` is
+Python 3.12. `torch`/`torchvision`/`ultralytics` are deliberately *not* in it —
+install them from the cu130 channel per `docs/SETUP_WINDOWS.md` when doing GPU
+work.
 
 ---
 

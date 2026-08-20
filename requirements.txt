@@ -1,7 +1,14 @@
 # CARLA Python API — install from CARLA release package
 # Download from: https://github.com/carla-simulator/carla/releases/tag/0.9.16
 # Then: pip install <path>/carla-0.9.16-cp3x-cp3x-win_amd64.whl
+# The 0.9.16 wheels are cp312 only, so the venv must be Python 3.12.
 # carla==0.9.16
+
+# Required by CARLA's own agents package, which pathfinder/sim/carla_backend.py
+# imports for route planning (agents.navigation.global_route_planner). It ships
+# with the CARLA release but is not declared by the wheel, so a fresh venv hits
+# ModuleNotFoundError on the first routed episode.
+networkx>=3.0
 
 # Deep learning
 torch>=2.0.0

@@ -363,6 +363,14 @@ class CarlaSimulator(SimulatorBackend):
         manager.set_random_device_seed(spec.seed)
         self._manager = manager
 
+        # Walker navigation draws from CARLA's own pedestrian RNG, which neither
+        # the episode's Random nor the traffic manager's seed reaches, and which
+        # load_world() does not reset. Left unseeded, every pedestrian picks
+        # different destinations on each run; the crowd perturbs traffic and
+        # traffic perturbs the ego, so two runs of one seed diverge despite a
+        # fixed delta and a seeded traffic manager. Must precede walker spawning.
+        self._world.set_pedestrians_seed(spec.seed)
+
     # ── route ────────────────────────────────────────────────────────────────
 
     def _build_route(self, spec: EpisodeSpec, start, rng: random.Random) -> RouteTracker:
@@ -782,8 +790,13 @@ class CarlaSimulator(SimulatorBackend):
         doomed = [actor for actor in self._traffic + self._walkers if actor is not None]
         if doomed and self._client is not None:
             try:
-                self._client.apply_batch(
-                    [self._carla.command.DestroyActor(actor) for actor in doomed]
+                # Synchronous: apply_batch is fire-and-forget, so the next
+                # episode could start spawning while the previous crowd is still
+                # being destroyed. That leaks actors ("failed to destroy actor:
+                # not found") and leaves two runs of one seed facing different
+                # worlds.
+                self._client.apply_batch_sync(
+                    [self._carla.command.DestroyActor(actor) for actor in doomed], False
                 )
             except Exception as error:
                 logger.debug("batch destroy failed: %s", error)
