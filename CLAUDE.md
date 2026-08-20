@@ -208,7 +208,7 @@ pathfinder/
               detected box (pure geometry, round-tripped against render.py's
               forward projection; saturates below min_measurable_range_m) ·
               detector.py (Detector seam + DetectorPerception + YoloDetector;
-              model cached once per process, eval mode, no TTA, pinned device)
+              Detector loaded once per process, eval mode, no TTA, pinned device)
   planning/   cil_model.py — 4-branch ResNet-18 CIL model (moved from
               top-level planning/, which no longer exists). The package keeps
               its name; ADR-0002 explains why the interface rename stopped here

@@ -19,24 +19,8 @@ from pathfinder.perception import PerceivedScene, PrivilegedPerception
 from pathfinder.policies import ModularPolicy
 from pathfinder.runner import ControlOutput, PurePursuitPolicy, run_episode
 from pathfinder.sim import EpisodeSpec, KinematicSimulator
-from pathfinder.sim.base import Command, FrameState
-
-
-def _frame(**overrides) -> FrameState:
-    base = dict(
-        frame_index=5,
-        simulation_time=0.25,
-        x=1.0,
-        y=2.0,
-        yaw_degrees=3.0,
-        speed_mps=6.0,
-        command=Command.FOLLOW_LANE,
-        distance_travelled_m=12.0,
-        nearest_object_m=7.3,
-        detections=2,
-    )
-    base.update(overrides)
-    return FrameState(**base)
+from pathfinder.sim.base import FrameState
+from tests.support import make_frame as _frame
 
 
 class _StubPerception:
