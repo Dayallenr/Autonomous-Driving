@@ -54,7 +54,9 @@ class Column:
 
 #: Per-frame telemetry. Column order is stable: Redshift COPY from Parquet
 #: matches on position when names are not supplied, so reordering silently
-#: shifts data between columns. Append only.
+#: shifts data between columns. New columns go immediately before
+#: ``event_date``, which must stay last — both DDL generators treat the final
+#: column as the partition key.
 FRAME_COLUMNS: tuple[Column, ...] = (
     Column("episode_id", "string", "VARCHAR(64)", "string", "joins to episode_results"),
     Column("frame_index", "int64", "BIGINT", "bigint", "monotonic within an episode"),
@@ -74,7 +76,7 @@ FRAME_COLUMNS: tuple[Column, ...] = (
     Column("detections", "int64", "INTEGER", "int", "objects detected this frame"),
     Column("nearest_object_m", "double", "DOUBLE PRECISION", "double", "range to closest object"),
     Column("policy_latency_ms", "double", "DOUBLE PRECISION", "double", "policy step cost"),
-    Column("perception_latency_ms", "double", "DOUBLE PRECISION", "double", "detector cost"),
+    Column("perception_latency_ms", "double", "DOUBLE PRECISION", "double", "perception cost, distinct from policy cost"),
     Column("infraction", "string", "VARCHAR(32)", "string", "empty when none"),
     # Provenance, repeated on every frame. It duplicates across a whole episode,
     # which Parquet's dictionary encoding costs almost nothing for, and it is
@@ -82,6 +84,7 @@ FRAME_COLUMNS: tuple[Column, ...] = (
     # produce it — including the CARLA baseline, which is not project work.
     Column("model_version", "string", "VARCHAR(64)", "string", "policy that drove this frame"),
     Column("dataset_version", "string", "VARCHAR(64)", "string", "data that policy trained on"),
+    Column("perception", "string", "VARCHAR(64)", "string", "perception that produced this frame's obstacle fields"),
     Column("event_date", "string", "VARCHAR(10)", "string", "YYYY-MM-DD partition key"),
 )
 

@@ -194,15 +194,29 @@ class ModularPolicy:
     def __init__(self, perception: Perception, controller: Policy) -> None:
         self._perception = perception
         self._controller = controller
+        # Provenance is read off the component itself rather than passed in, so
+        # a frame can never be attributed to a perception that did not run.
+        # A Perception that declares no NAME is still identifiable by class.
+        self._perception_name = getattr(
+            perception, "NAME", type(perception).__name__
+        )
 
     def plan(self, state: FrameState) -> ControlOutput:
+        perception_started = time.perf_counter()
         scene = self._perception.perceive(state)
+        perception_ms = (time.perf_counter() - perception_started) * 1000.0
+
         perceived = replace(
             state,
             nearest_object_m=scene.nearest_object_m,
             detections=scene.detections,
         )
-        return self._controller.plan(perceived)
+        control = self._controller.plan(perceived)
+        return replace(
+            control,
+            perception=self._perception_name,
+            perception_latency_ms=perception_ms,
+        )
 
 
 def _build_pure_pursuit(simulator, **kwargs) -> Policy:

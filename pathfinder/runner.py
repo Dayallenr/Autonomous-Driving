@@ -38,6 +38,16 @@ class ControlOutput:
     #: How long the policy took, carried into telemetry so policy latency is
     #: measured rather than estimated.
     latency_ms: float = 0.0
+    #: Which perception implementation produced the obstacle fields this
+    #: control was planned on. Stamped by ``ModularPolicy`` from the component
+    #: that actually ran; the default is honest for every other Policy, which
+    #: reads the simulator's ground truth directly.
+    perception: str = "privileged"
+    #: How long that perception took, measured per frame and kept separate
+    #: from ``latency_ms`` so Detector inference cost is visible against the
+    #: control rate rather than inferred from a total. Zero when no perception
+    #: component ran.
+    perception_latency_ms: float = 0.0
 
 
 class Policy(Protocol):
@@ -165,11 +175,7 @@ def run_episode(
     try:
         while frames < spec.max_steps:
             control = policy.plan(state)
-
-            perception_started = time.perf_counter()
             result = simulator.step(control.throttle, control.steer, control.brake)
-            step_ms = (time.perf_counter() - perception_started) * 1000.0
-
             frames += 1
             infractions.extend(result.infractions)
 
@@ -199,7 +205,12 @@ def run_episode(
                                 else -1.0
                             ),
                             "policy_latency_ms": control.latency_ms,
-                            "perception_latency_ms": step_ms,
+                            # Both measured by the Policy itself; the runner
+                            # forwards rather than re-derives them. This field
+                            # used to hold simulator step time under the same
+                            # name — a mislabel, fixed rather than kept.
+                            "perception": control.perception,
+                            "perception_latency_ms": control.perception_latency_ms,
                             "infraction": result.infractions[0].value
                             if result.infractions
                             else "",

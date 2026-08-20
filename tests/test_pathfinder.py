@@ -780,3 +780,31 @@ def test_redshift_ddl_sets_distribution_strategy():
     ddl = redshift_ddl()
     assert "DISTKEY(episode_id)" in ddl
     assert "DISTSTYLE ALL" in ddl  # small episode table replicated for joins
+
+
+def test_frame_schema_carries_perception_provenance(tmp_path):
+    """A frame row's perception identifier and latency survive the trip into
+    Parquet, and rows written before the fields existed still ingest (as
+    nulls) — the schema grew without breaking existing producers."""
+    pytest.importorskip("pyarrow")
+    import pyarrow.parquet as pq
+
+    warehouse = TelemetryWarehouse(LocalObjectStore(tmp_path))
+    keys = warehouse.write_frames(
+        [
+            {
+                "episode_id": "e1", "frame_index": 0, "timestamp": datetime.now(UTC),
+                "perception": "privileged", "perception_latency_ms": 0.2,
+                "event_date": "2026-08-20",
+            },
+            # A pre-provenance row: no perception fields at all.
+            {"episode_id": "e0", "frame_index": 0, "timestamp": datetime.now(UTC),
+             "event_date": "2026-08-20"},
+        ]
+    )
+
+    table = pq.read_table(tmp_path / keys[0])
+    assert table.column("perception").to_pylist() == ["privileged", None]
+    # The partition key must stay the last column: both DDL generators and the
+    # writer's directory layout key off it.
+    assert FRAME_COLUMNS[-1].name == "event_date"
