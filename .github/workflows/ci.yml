@@ -71,31 +71,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check whether terraform/ exists yet
-        id: has_tf
-        run: echo "present=$([ -d terraform ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
       - uses: hashicorp/setup-terraform@v4.0.1
-        if: steps.has_tf.outputs.present == 'true'
       - name: terraform fmt -check
-        if: steps.has_tf.outputs.present == 'true'
         working-directory: terraform
         run: terraform fmt -check -recursive
       # -backend=false: validate is a static check on the config, not the
       # applied state, so no AWS credentials are needed to run it in CI.
       - name: terraform init
-        if: steps.has_tf.outputs.present == 'true'
         working-directory: terraform
         run: terraform init -backend=false
       - name: terraform validate
-        if: steps.has_tf.outputs.present == 'true'
         working-directory: terraform
         run: terraform validate
       - name: checkov static analysis
-        if: steps.has_tf.outputs.present == 'true'
         uses: bridgecrewio/checkov-action@v12.3116.0
         with:
           directory: terraform
           framework: terraform
-      - name: (no-op until Phase 7 adds terraform/)
-        if: steps.has_tf.outputs.present == 'false'
-        run: echo "terraform/ does not exist yet — nothing to validate"
