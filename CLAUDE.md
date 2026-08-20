@@ -151,7 +151,7 @@ are all set together.
 | 1 KITTI data pipeline | **Done** — sequence-disjoint split, reproducible on Mac + Windows |
 | 2 Perception | **Done** — YOLOv8m trained, evaluated, `results/perception/yolov8m/report.json` |
 | — CARLA backend rewrite | **Written, never executed against a live server** ← next |
-| 3 CIL planner + DAgger | Not started — needs CARLA |
+| 3 CIL Policy + DAgger | Not started — needs CARLA |
 | 4 GT-vs-YOLO ablation | Not started — needs CARLA |
 | 5 Distributed benchmark (SQS, telemetry, Parquet) | Queue/telemetry/warehouse code exists and is tested; needs real CARLA episodes and real AWS SQS |
 | 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
@@ -160,7 +160,7 @@ are all set together.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-215 tests pass; `ruff check` clean.
+216 tests pass; `ruff check` clean.
 
 ---
 
@@ -205,18 +205,21 @@ pathfinder/
               round-tripped against render.py's forward projection; saturates
               below min_measurable_range_m)
   planning/   cil_model.py — 4-branch ResNet-18 CIL model (moved from
-              top-level planning/, which no longer exists)
+              top-level planning/, which no longer exists). The package keeps
+              its name; ADR-0002 explains why the interface rename stopped here
   rpc/        coordinator.py (servicer) · server.py (binds a port)
               client.py · generated stubs
-  planners.py — build_planner(name) Policy registry; CarlaBehaviorAgentPlanner
-              wraps CARLA's own BehaviorAgent as the reference baseline,
-              registered as `carla_builtin_behavior_agent` (never run live)
+  policies.py — build_policy(name) registry for the `Policy` protocol;
+              CarlaBehaviorAgentPolicy wraps CARLA's own BehaviorAgent as the
+              reference baseline, registered as `carla_builtin_behavior_agent`
+              (never run against a live server)
   orchestration.py · runner.py · dagger.py · benchmark_detector.py
 scripts/      prepare_kitti.py · train_detector.py · eval_detector.py
               plot_data_report.py · probe_carla.py · generate_protos.py
               bench_rpc_latency.py · run_worker.py · enqueue_episodes.py
               archive_telemetry.py
-docs/         DATA.md · SETUP_WINDOWS.md · adr/ · agents/
+docs/         DATA.md · SETUP_WINDOWS.md · adr/ (0001 modular, 0002
+              Policy naming) · agents/
 terraform/    EKS · ECR · SQS+DLQ · S3 · Kinesis · KMS · IRSA · OIDC
               (validated, never applied)
 k8s/          kind manifests + eks/ overlay

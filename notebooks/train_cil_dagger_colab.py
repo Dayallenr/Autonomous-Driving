@@ -1,7 +1,7 @@
 # %% [markdown]
 # # PathFinder — Conditional Imitation Learning + DAgger (GPU training)
 #
-# Trains the 4-branch ResNet-18 CIL planner with DAgger against a privileged
+# Trains the 4-branch ResNet-18 CIL policy with DAgger against a privileged
 # pure-pursuit expert, inside the deterministic kinematic simulator.
 #
 # When it finishes, download `cil_dagger.pt` from the last cell and drop it at:
@@ -84,12 +84,12 @@ else:
 # %%
 import matplotlib.pyplot as plt
 
-from pathfinder.runner import PurePursuitPlanner
+from pathfinder.runner import PurePursuitPolicy
 from pathfinder.sim import EpisodeSpec, KinematicSimulator
 
 simulator = KinematicSimulator(render=True)
 state = simulator.reset(EpisodeSpec(episode_id="preview", route_length_m=300, seed=3))
-expert = PurePursuitPlanner()
+expert = PurePursuitPolicy()
 
 frames = []
 for step in range(300):
@@ -128,7 +128,7 @@ for index in range(12):
     spec = EpisodeSpec(
         episode_id=f"expert-{index}", route_length_m=300, max_steps=1200, seed=5000 + index
     )
-    expert_scores.append(run_episode(simulator, spec, PurePursuitPlanner()))
+    expert_scores.append(run_episode(simulator, spec, PurePursuitPolicy()))
 simulator.close()
 
 expert_summary = aggregate(expert_scores)
@@ -238,7 +238,7 @@ plt.show()
 # rather than recall.
 
 # %%
-from pathfinder.dagger import CILPlanner
+from pathfinder.dagger import CILPolicy
 
 simulator = KinematicSimulator(render=True)
 student_scores = []
@@ -247,7 +247,7 @@ for index in range(12):
         episode_id=f"student-{index}", route_length_m=300, max_steps=1200, seed=5000 + index
     )
     student_scores.append(
-        run_episode(simulator, spec, CILPlanner(model, device=DEVICE), model_version="cil_dagger")
+        run_episode(simulator, spec, CILPolicy(model, device=DEVICE), model_version="cil_dagger")
     )
 simulator.close()
 

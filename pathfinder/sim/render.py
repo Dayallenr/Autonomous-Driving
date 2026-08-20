@@ -3,9 +3,9 @@ Forward-view renderer for the kinematic backend.
 
 Why render at all
 -----------------
-The CIL planner is a ResNet-18 over camera images. Without images the kinematic
+The CIL policy is a ResNet-18 over camera images. Without images the kinematic
 backend can exercise orchestration and scoring but not the actual learned
-planner, which would leave the largest ML claim in the project untestable
+policy, which would leave the largest ML claim in the project untestable
 anywhere CARLA does not run.
 
 So the kinematic backend renders a synthetic forward view: lane edges, the route

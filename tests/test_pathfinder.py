@@ -43,7 +43,7 @@ from pathfinder.metrics.driving_score import (
     score_episode,
 )
 from pathfinder.orchestration import BenchmarkCoordinator, build_episode_specs
-from pathfinder.runner import PurePursuitPlanner, run_episode
+from pathfinder.runner import PurePursuitPolicy, run_episode
 from pathfinder.sim import EpisodeSpec, Infraction, KinematicSimulator, build_simulator
 from pathfinder.sim.render import RENDER_HEIGHT, RENDER_WIDTH
 
@@ -439,7 +439,7 @@ def test_episode_is_deterministic_in_its_seed():
     scores = []
     for _ in range(2):
         simulator = KinematicSimulator()
-        scores.append(run_episode(simulator, spec, PurePursuitPlanner()).driving_score)
+        scores.append(run_episode(simulator, spec, PurePursuitPolicy()).driving_score)
         simulator.close()
     assert scores[0] == pytest.approx(scores[1])
 
@@ -449,7 +449,7 @@ def test_different_seeds_give_different_episodes():
     for seed in (1, 2):
         simulator = KinematicSimulator()
         spec = EpisodeSpec(episode_id="e", route_length_m=200, max_steps=400, seed=seed)
-        results.append(run_episode(simulator, spec, PurePursuitPlanner()).to_dict())
+        results.append(run_episode(simulator, spec, PurePursuitPolicy()).to_dict())
         simulator.close()
     assert results[0] != results[1]
 
@@ -460,7 +460,7 @@ def test_step_before_reset_raises():
 
 
 def test_controls_are_clamped_not_rejected():
-    """A planner emitting out-of-range controls is a bug worth surviving, and
+    """A policy emitting out-of-range controls is a bug worth surviving, and
     saturating is what real actuators do."""
     simulator = KinematicSimulator()
     simulator.reset(EpisodeSpec(episode_id="e", route_length_m=100))
@@ -475,7 +475,7 @@ def test_baseline_planner_completes_routes():
         run_episode(
             simulator,
             EpisodeSpec(episode_id=f"e{i}", route_length_m=300, max_steps=1200, seed=200 + i),
-            PurePursuitPlanner(),
+            PurePursuitPolicy(),
         )
         for i in range(6)
     ]
@@ -522,7 +522,7 @@ def test_telemetry_sink_failure_does_not_abort_episode():
     score = run_episode(
         simulator,
         EpisodeSpec(episode_id="e", route_length_m=150, max_steps=400),
-        PurePursuitPlanner(),
+        PurePursuitPolicy(),
         telemetry_sink=broken_sink,
     )
     simulator.close()
@@ -720,7 +720,7 @@ def test_warehouse_writes_partitioned_parquet(tmp_path):
             "weather": "ClearNoon", "x": 0.0, "y": 0.0, "yaw_degrees": 0.0,
             "speed_mps": 5.0, "throttle": 0.4, "brake": 0.0, "steer": 0.0,
             "command": 0, "detections": 1, "nearest_object_m": 20.0,
-            "planner_latency_ms": 0.1, "perception_latency_ms": 0.2,
+            "policy_latency_ms": 0.1, "perception_latency_ms": 0.2,
             "infraction": "", "event_date": "2026-04-01",
         }
         for i in range(10)

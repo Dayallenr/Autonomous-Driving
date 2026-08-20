@@ -1,5 +1,5 @@
 """
-DAgger: Dataset Aggregation for the conditional imitation-learning planner.
+DAgger: Dataset Aggregation for the conditional imitation-learning policy.
 
 The problem DAgger solves
 -------------------------
@@ -17,7 +17,7 @@ The fix is to train on the distribution the student actually induces:
 4. Retrain on everything collected so far.
 5. Repeat.
 
-The expert here is :class:`PurePursuitPlanner`, which is *privileged*: it reads
+The expert here is :class:`PurePursuitPolicy`, which is *privileged*: it reads
 exact cross-track error, heading error, and curvature from the simulator. The
 student sees only rendered pixels. That asymmetry is the point — the student
 learns to infer from images what the expert is handed directly, which is exactly
@@ -66,13 +66,13 @@ import numpy as np
 import torch
 from torch import nn
 
-from pathfinder.runner import ControlOutput, PurePursuitPlanner
+from pathfinder.runner import ControlOutput, PurePursuitPolicy
 from pathfinder.sim.base import EpisodeSpec, FrameState
 from pathfinder.sim.kinematic import KinematicSimulator
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["CILPlanner", "DAggerConfig", "DAggerReport", "IterationReport", "run_dagger"]
+__all__ = ["CILPolicy", "DAggerConfig", "DAggerReport", "IterationReport", "run_dagger"]
 
 # ImageNet statistics: the ResNet-18 backbone is pretrained with these, and
 # feeding it differently-normalized input wastes most of the transfer.
@@ -87,8 +87,8 @@ def preprocess(image: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(array.transpose(2, 0, 1))
 
 
-class CILPlanner:
-    """Wraps a CIL model so it satisfies the :class:`Planner` protocol.
+class CILPolicy:
+    """Wraps a CIL model so it satisfies the :class:`Policy` protocol.
 
     Selects the branch matching the current command, which is what makes this
     *conditional* imitation learning: at an intersection the same image has
@@ -106,7 +106,7 @@ class CILPlanner:
         started = time.perf_counter()
         if state.image is None:
             raise ValueError(
-                "CILPlanner requires rendered frames; construct the simulator "
+                "CILPolicy requires rendered frames; construct the simulator "
                 "with KinematicSimulator(render=True)"
             )
         tensor = preprocess(state.image).unsqueeze(0).to(self.device)
@@ -185,15 +185,15 @@ class DAggerReport:
         }
 
 
-def _expert_control(planner: PurePursuitPlanner, state: FrameState) -> np.ndarray:
-    control = planner.plan(state)
+def _expert_control(policy: PurePursuitPolicy, state: FrameState) -> np.ndarray:
+    control = policy.plan(state)
     return np.array([control.steer, control.throttle, control.brake], dtype=np.float32)
 
 
 def _collect(
     simulator: KinematicSimulator,
-    expert: PurePursuitPlanner,
-    student: CILPlanner | None,
+    expert: PurePursuitPolicy,
+    student: CILPolicy | None,
     spec: EpisodeSpec,
     beta: float,
     rng: np.random.Generator,
@@ -269,7 +269,7 @@ def run_dagger(
         model = CILModel(pretrained=False, output_mode="control")
     model = model.to(config.device)
 
-    expert = PurePursuitPlanner()
+    expert = PurePursuitPolicy()
     simulator = KinematicSimulator(render=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.L1Loss()
@@ -287,7 +287,7 @@ def run_dagger(
             # Iteration 0 is pure expert: an untrained student's rollouts are
             # noise, and aggregating them first would poison the dataset.
             beta = 1.0 if iteration == 0 else config.beta_decay**iteration
-            student = None if iteration == 0 else CILPlanner(model, device=config.device)
+            student = None if iteration == 0 else CILPolicy(model, device=config.device)
 
             episode_disagreements: list[float] = []
             completions: list[float] = []
