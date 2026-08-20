@@ -42,7 +42,14 @@ from __future__ import annotations
 
 import numpy as np
 
-__all__ = ["RENDER_HEIGHT", "RENDER_WIDTH", "render_forward_view"]
+__all__ = [
+    "CAMERA_HEIGHT_M",
+    "FOCAL_LENGTH_PX",
+    "RENDER_HEIGHT",
+    "RENDER_WIDTH",
+    "project_ground_point",
+    "render_forward_view",
+]
 
 #: 200x88 is the input resolution used by the original CIL paper; keeping it
 #: means the published architecture's stride/pooling arithmetic works unchanged.
@@ -67,8 +74,20 @@ _RED_LIGHT = (30, 30, 230)
 _GREEN_LIGHT = (30, 200, 30)
 
 
-def _project(forward_m: float, lateral_m: float, height_m: float = 0.0) -> tuple[int, int] | None:
-    """Project an ego-frame ground point to pixel coordinates, or None if behind."""
+def project_ground_point(forward_m: float, lateral_m: float,
+                         height_m: float = 0.0) -> tuple[int, int] | None:
+    """Project an ego-frame point to pixel coordinates, or None if too near.
+
+    Public because it is the forward direction of the projection that
+    :mod:`pathfinder.perception.geometry` inverts, and that inverse is
+    round-trip tested against this function. A test reaching into a private
+    helper to do that would depend on an implementation detail, whereas the
+    round trip is a property of the pair — so both halves are public.
+
+    The returned coordinates are deliberately not clipped to the canvas: a
+    point close enough to the camera projects below the frame, and the caller
+    decides whether that is a box to draw or an object too near to see.
+    """
     if forward_m <= NEAR_PLANE_M:
         return None
     u = RENDER_WIDTH / 2.0 - FOCAL_LENGTH_PX * (lateral_m / forward_m)
@@ -149,8 +168,8 @@ def render_forward_view(
     previous: tuple[tuple[int, int], tuple[int, int]] | None = None
     for distance in samples:
         centre = _path_lateral_at(distance, lateral_error, heading_error, curvature)
-        left = _project(distance, centre + LANE_HALF_WIDTH_M)
-        right = _project(distance, centre - LANE_HALF_WIDTH_M)
+        left = project_ground_point(distance, centre + LANE_HALF_WIDTH_M)
+        right = project_ground_point(distance, centre - LANE_HALF_WIDTH_M)
         if left is None or right is None:
             previous = None
             continue
@@ -167,7 +186,7 @@ def render_forward_view(
         last_point: tuple[int, int] | None = None
         for index, distance in enumerate(samples):
             centre = _path_lateral_at(distance, lateral_error, heading_error, curvature)
-            point = _project(distance, centre + offset)
+            point = project_ground_point(distance, centre + offset)
             if point is None:
                 last_point = None
                 continue
@@ -185,10 +204,10 @@ def render_forward_view(
         colour = {"vehicle": _VEHICLE, "pedestrian": _PEDESTRIAN}.get(kind, _STATIC)
         width_m, height_m = (1.8, 1.5) if kind == "vehicle" else (0.6, 1.7)
 
-        bottom_left = _project(forward, lateral + width_m / 2)
-        bottom_right = _project(forward, lateral - width_m / 2)
-        top_left = _project(forward, lateral + width_m / 2, height_m)
-        top_right = _project(forward, lateral - width_m / 2, height_m)
+        bottom_left = project_ground_point(forward, lateral + width_m / 2)
+        bottom_right = project_ground_point(forward, lateral - width_m / 2)
+        top_left = project_ground_point(forward, lateral + width_m / 2, height_m)
+        top_right = project_ground_point(forward, lateral - width_m / 2, height_m)
         if None in (bottom_left, bottom_right, top_left, top_right):
             continue
         _fill_polygon(canvas, [top_left, top_right, bottom_right, bottom_left], colour)
@@ -198,7 +217,7 @@ def render_forward_view(
     if state and NEAR_PLANE_M < distance < FAR_PLANE_M:
         centre = _path_lateral_at(distance, lateral_error, heading_error, curvature)
         # Mounted above the road, so it sits high in frame like a real signal.
-        point = _project(distance, centre, height_m=5.0)
+        point = project_ground_point(distance, centre, height_m=5.0)
         if point is not None:
             radius = max(1, int(40.0 / distance))
             colour = _RED_LIGHT if state == "red" else _GREEN_LIGHT
