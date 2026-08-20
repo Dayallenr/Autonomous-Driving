@@ -187,7 +187,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 2 Perception | **Done** — YOLOv8m trained, evaluated, `results/perception/yolov8m/report.json` |
 | — CARLA backend rewrite | **Validated against a live server** (2026-08-20) — `scripts/validate_carla_backend.py` passes every issue #5 criterion and writes `results/carla/backend_validation.json`. Three real bugs were found and fixed by running it; see "Established findings". The ego completes **47% of a 351 m Town05 route** before `agent_blocked`, which is a driving-quality ceiling of `PurePursuitPolicy` in CARLA, **not** a backend defect — no learned policy has driven this backend yet |
 | 3 CIL Policy + DAgger | Not started — needs CARLA |
-| 4 GT-vs-YOLO ablation | **Mechanism done** — `python -m pathfinder.ablation` runs both arms over identical seeded specs, records observed provenance per Episode, and labels kinematic reports pipeline-only (`results/ablation/kinematic_report.json`). The measurement bias #10 recorded is addressed: the CARLA privileged arm is written to measure forward-frustum, camera-origin, ground-plane range to the obstacle's nearest visible surface — the same convention the Detector arm inverts. The convention geometry is pinned by `tests/test_range_convention.py`; the CARLA wiring around it (bounding-box offsets, actor filtering) is part of the unvalidated backend and gets exercised by #5's validation run. The real number needs CARLA (#10) |
+| 4 GT-vs-YOLO ablation | **Mechanism done** — `python -m pathfinder.ablation` runs both arms over identical seeded specs, records observed provenance per Episode, and labels kinematic reports pipeline-only (`results/ablation/kinematic_report.json`). The measurement bias #10 recorded is addressed: the CARLA privileged arm is written to measure forward-frustum, camera-origin, ground-plane range to the obstacle's nearest visible surface — the same convention the Detector arm inverts. The convention geometry is pinned by `tests/test_range_convention.py`; the CARLA wiring around it (bounding-box offsets, actor filtering) is part of the unvalidated backend and gets exercised by #5's validation run. The write-up is generated from the report JSON by `pathfinder/ablation_writeup.py` (boundary sentence, infraction breakdown, binding-constraint verdict — tested in `tests/test_ablation_writeup.py`) and lands next to it automatically. The real number needs the user to run `python -m pathfinder.ablation --backend carla --episodes 10 --device cuda` on Windows — runbook in `docs/SETUP_WINDOWS.md` §7 (#10) |
 | 5 Distributed benchmark (SQS, telemetry, Parquet) | Queue/telemetry/warehouse code exists and is tested; needs real CARLA episodes and real AWS SQS |
 | 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
 | 7 Terraform / LocalStack / kind | **Written, never applied** — `terraform/` passes `fmt -check`, `init -backend=false`, `validate`, and `checkov` in CI; provisions EKS, ECR, SQS+DLQ, S3, **Kinesis**, KMS, IRSA, GitHub OIDC. `k8s/` carries kind manifests and an `eks/` overlay. Nothing has been applied to real AWS |
@@ -200,6 +200,12 @@ that a driven episode only ever surfaces commands its own route planned.
 ---
 
 ## Immediate next step
+
+**Issue #10 is fully prepared and waiting on one Windows sitting**: the user
+runs `python -m pathfinder.ablation --backend carla --episodes 10 --device
+cuda` per `docs/SETUP_WINDOWS.md` §7 and pushes `results/ablation/`. The run
+writes both the report JSON and its generated write-up. After the push, review
+the numbers, quote them in the issue, and close #10.
 
 The CARLA backend is validated (issue #5, above). Phase 3 — CIL Policy + DAgger —
 is unblocked.
@@ -254,6 +260,9 @@ pathfinder/
   orchestration.py · runner.py · dagger.py · benchmark_detector.py
   ablation.py — the GT-vs-Detector ablation: run_ablation() + CLI; provenance
               observed from telemetry, kinematic reports labelled pipeline-only
+  ablation_writeup.py — renders a report JSON into its Markdown write-up
+              (scope banner, boundary sentence, infraction breakdown,
+              binding-constraint verdict); called by the ablation CLI
 scripts/      prepare_kitti.py · train_detector.py · eval_detector.py
               plot_data_report.py · probe_carla.py · generate_protos.py
               bench_rpc_latency.py · run_worker.py · enqueue_episodes.py
@@ -265,7 +274,8 @@ terraform/    EKS · ECR · SQS+DLQ · S3 · Kinesis · KMS · IRSA · OIDC
 k8s/          kind manifests + eks/ overlay
 .github/      workflows/ci.yml · workflows/deploy.yml (manual only)
 results/      data/ (figures) · perception/ (reports) · carla/probe.json
-              rpc/latency_report.json · ablation/ (pipeline-only kinematic report)
+              rpc/latency_report.json · ablation/ (pipeline-only kinematic
+              report + generated write-up)
 ```
 
 **The legacy classical-ADS stack is gone.** `agent.py`, top-level

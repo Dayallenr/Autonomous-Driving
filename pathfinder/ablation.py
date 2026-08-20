@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pathfinder.ablation_writeup import render_writeup
 from pathfinder.metrics.driving_score import EpisodeScore, aggregate
 from pathfinder.perception.base import Perception, perception_name
 from pathfinder.perception.detector import TRAINED_WEIGHTS
@@ -403,6 +404,11 @@ def main(argv: list[str] | None = None) -> int:
     output.write_text(json.dumps(report, indent=2) + "\n")
     partial.unlink(missing_ok=True)
 
+    # The write-up lands with the report so a CARLA sitting can never end with
+    # numbers but no document stating what they are allowed to mean.
+    writeup = output.with_suffix(".md")
+    writeup.write_text(render_writeup(report, source=str(output)))
+
     print(f"backend: {report['backend']} ({report['scope']})")
     print(f"baseline  {report['baseline']['perception']:>12}: "
           f"driving score {report['baseline']['summary']['driving_score']}")
@@ -412,6 +418,7 @@ def main(argv: list[str] | None = None) -> int:
     if report["scope"] == "pipeline-only":
         print("NOTE: pipeline-only run — these numbers are not driving quality.")
     print(f"report written to {output}")
+    print(f"write-up written to {writeup}")
     return 0
 
 
