@@ -36,7 +36,8 @@ from dataclasses import dataclass, field
 
 from pathfinder.cloud.queue import MessageQueue
 from pathfinder.metrics.driving_score import BenchmarkSummary, EpisodeScore, aggregate
-from pathfinder.runner import Planner, PurePursuitPlanner, run_episode
+from pathfinder.planners import DEFAULT_PLANNER, build_planner, result_label
+from pathfinder.runner import Planner, run_episode
 from pathfinder.sim.base import EpisodeSpec
 from pathfinder.sim.carla_backend import build_simulator
 
@@ -119,19 +120,19 @@ class EpisodeWorker:
         worker_id: str,
         queue: MessageQueue,
         *,
-        planner_factory=PurePursuitPlanner,
+        planner_name: str = DEFAULT_PLANNER,
         simulator_backend: str = "auto",
         telemetry_sink=None,
-        model_version: str = "pure_pursuit",
+        model_version: str | None = None,
         dataset_version: str = "",
         idle_timeout_seconds: float = 2.0,
     ) -> None:
         self.worker_id = worker_id
         self.queue = queue
-        self.planner_factory = planner_factory
+        self.planner_name = planner_name
         self.simulator_backend = simulator_backend
         self.telemetry_sink = telemetry_sink
-        self.model_version = model_version
+        self.model_version = result_label(planner_name, model_version)
         self.dataset_version = dataset_version
         self.idle_timeout_seconds = idle_timeout_seconds
 
@@ -145,10 +146,15 @@ class EpisodeWorker:
     def run(self) -> list[EpisodeScore]:
         """Consume episodes until the queue is empty for ``idle_timeout_seconds``."""
         simulator = build_simulator(self.simulator_backend)
-        planner: Planner = self.planner_factory()
         idle_since: float | None = None
 
         try:
+            # After the simulator, because a Policy that drives the simulator's
+            # own actor needs it to exist first — and inside the try, so a
+            # mismatched pair still restores a CARLA server to async mode on the
+            # way out. Anything misconfigured raises here, before a single
+            # message leaves the queue.
+            planner: Planner = build_planner(self.planner_name, simulator=simulator)
             while not self._stop.is_set():
                 messages = self.queue.receive(max_messages=1, wait_seconds=0.2)
                 if not messages:
@@ -201,17 +207,17 @@ class BenchmarkCoordinator:
         self,
         queue: MessageQueue,
         *,
-        planner_factory=PurePursuitPlanner,
+        planner_name: str = DEFAULT_PLANNER,
         simulator_backend: str = "auto",
         telemetry_sink=None,
-        model_version: str = "pure_pursuit",
+        model_version: str | None = None,
         dataset_version: str = "",
     ) -> None:
         self.queue = queue
-        self.planner_factory = planner_factory
+        self.planner_name = planner_name
         self.simulator_backend = simulator_backend
         self.telemetry_sink = telemetry_sink
-        self.model_version = model_version
+        self.model_version = result_label(planner_name, model_version)
         self.dataset_version = dataset_version
 
     def run(self, specs: list[EpisodeSpec], *, workers: int = 4) -> BenchmarkRun:
@@ -234,7 +240,7 @@ class BenchmarkCoordinator:
             EpisodeWorker(
                 f"worker-{index}",
                 self.queue,
-                planner_factory=self.planner_factory,
+                planner_name=self.planner_name,
                 simulator_backend=self.simulator_backend,
                 telemetry_sink=self.telemetry_sink,
                 model_version=self.model_version,

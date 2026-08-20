@@ -37,8 +37,14 @@ import grpc
 from pathfinder.cloud.queue import MessageQueue, build_queue, ensure_queue
 from pathfinder.cloud.stream import TelemetryStream, build_stream
 from pathfinder.metrics.driving_score import EpisodeScore
+from pathfinder.planners import (
+    DEFAULT_PLANNER,
+    PLANNER_NAMES,
+    build_planner,
+    result_label,
+)
 from pathfinder.rpc.client import CoordinatorClient, WorkerHeartbeatState, episode_score_to_proto
-from pathfinder.runner import PurePursuitPlanner, run_episode
+from pathfinder.runner import run_episode
 from pathfinder.sim.base import EpisodeSpec
 from pathfinder.sim.carla_backend import build_simulator
 
@@ -53,6 +59,7 @@ async def _drain_one(
     worker_id: str,
     state: WorkerHeartbeatState,
     wait_seconds: float,
+    model_version: str = "",
     telemetry_stream: TelemetryStream | None = None,
 ) -> EpisodeScore | None:
     """Receive and run at most one episode. Returns ``None`` if the queue had
@@ -81,7 +88,8 @@ async def _drain_one(
 
     try:
         score = await asyncio.to_thread(
-            run_episode, simulator, spec, planner, worker_id=worker_id, telemetry_sink=telemetry_sink
+            run_episode, simulator, spec, planner,
+            worker_id=worker_id, model_version=model_version, telemetry_sink=telemetry_sink,
         )
         # Delete only after a result exists, so a crash mid-episode leaves the
         # message for another worker rather than silently losing the episode.
@@ -97,6 +105,8 @@ async def run_worker(
     coordinator_address: str,
     queue: MessageQueue,
     simulator_backend: str = "kinematic",
+    planner_name: str = DEFAULT_PLANNER,
+    model_version: str | None = None,
     idle_timeout_seconds: float = 5.0,
     receive_wait_seconds: float = 2.0,
     stop_event: asyncio.Event | None = None,
@@ -123,15 +133,21 @@ async def run_worker(
     client.start_heartbeat(worker_id, registration.heartbeat_interval_seconds, state)
 
     simulator = build_simulator(simulator_backend)
-    planner = PurePursuitPlanner()
+    label = result_label(planner_name, model_version)
     idle_since: float | None = None
 
     try:
+        # After the simulator: a Policy that drives the simulator's own actor
+        # needs it to exist first. Anything misconfigured — CARLA's behaviour
+        # agent asked to drive the kinematic backend, say — raises here, before
+        # a single message is taken off the queue, rather than turning every
+        # Episode into a scored failure. Inside the try so teardown still runs.
+        planner = build_planner(planner_name, simulator=simulator)
         while not client.should_stop and (stop_event is None or not stop_event.is_set()):
             score = await _drain_one(
                 queue, simulator, planner,
                 worker_id=worker_id, state=state, wait_seconds=receive_wait_seconds,
-                telemetry_stream=telemetry_stream,
+                model_version=label, telemetry_stream=telemetry_stream,
             )
             if score is None:
                 # idle_timeout_seconds <= 0 means "never give up" — the shape
@@ -161,6 +177,7 @@ async def run_worker(
             proto_result = episode_score_to_proto(
                 score,
                 worker_id=worker_id,
+                model_version=label,
                 simulator_backend=simulator_backend,
             )
             submit_response = await client.submit_result(proto_result)
@@ -208,6 +225,18 @@ def main() -> None:
     parser.add_argument("--queue-endpoint-url", type=str, default=None, help="For LocalStack")
     parser.add_argument("--queue-region", type=str, default="us-east-1")
     parser.add_argument("--simulator-backend", choices=["kinematic", "carla", "auto"], default="kinematic")
+    parser.add_argument(
+        "--planner", choices=list(PLANNER_NAMES), default=DEFAULT_PLANNER,
+        help="Which Policy to score. 'carla_builtin_behavior_agent' is CARLA's own "
+        "behaviour agent, kept as a reference baseline rather than as project work; "
+        "it needs --simulator-backend carla.",
+    )
+    parser.add_argument(
+        "--model-version", type=str, default=None,
+        help="Label recorded against every result. Defaults to --planner; set it "
+        "explicitly when the Policy has trained weights whose version its name "
+        "does not carry.",
+    )
     parser.add_argument("--idle-timeout-seconds", type=float, default=5.0)
     parser.add_argument(
         "--telemetry-backend", choices=["none", "local", "kinesis"], default="none",
@@ -273,6 +302,8 @@ async def _run_with_signal_handling(
         coordinator_address=args.coordinator,
         queue=queue,
         simulator_backend=args.simulator_backend,
+        planner_name=args.planner,
+        model_version=args.model_version,
         idle_timeout_seconds=args.idle_timeout_seconds,
         stop_event=stop_event,
         telemetry_stream=telemetry_stream,

@@ -127,6 +127,7 @@ class CarlaSimulator(SimulatorBackend):
 
         self._spec: EpisodeSpec | None = None
         self._route: RouteTracker | None = None
+        self._destination = None
         self._frame = 0
         self._time = 0.0
         self._distance = 0.0
@@ -139,6 +140,24 @@ class CarlaSimulator(SimulatorBackend):
     @property
     def name(self) -> str:
         return "carla"
+
+    @property
+    def vehicle(self):
+        """The ego actor, or None before the first ``reset``.
+
+        Exposed for Policies that drive the actor directly rather than through
+        :meth:`step` — CARLA's own behaviour agent is one. Deliberately not on
+        :class:`SimulatorBackend`: a handle to a live CARLA actor is exactly the
+        kind of thing the abstraction exists to keep out of the driving loop.
+        """
+        return self._vehicle
+
+    @property
+    def route_destination(self):
+        """``carla.Location`` the planned route ends at, or None before the
+        first ``reset``. Same audience as :attr:`vehicle`: a Policy that plans
+        its own path needs somewhere to plan it to."""
+        return self._destination
 
     # ── world ────────────────────────────────────────────────────────────────
 
@@ -200,6 +219,7 @@ class CarlaSimulator(SimulatorBackend):
         rng.shuffle(candidates)
 
         best: list[RoutePoint] = []
+        best_end = None
         for destination in candidates[:20]:
             if destination.location.distance(start.location) < spec.route_length_m * 0.5:
                 continue
@@ -222,6 +242,11 @@ class CarlaSimulator(SimulatorBackend):
             ]
             if len(points) > len(best):
                 best = points
+                # The waypoint's own location, not the sampled spawn point: the
+                # planner ends at the nearest waypoint to the destination, and
+                # a Policy aiming at the spawn point instead would think it had
+                # further to go than the route actually covers.
+                best_end = plan[-1][0].transform.location
             if len(points) * ROUTE_RESOLUTION_M >= spec.route_length_m:
                 break
 
@@ -230,6 +255,7 @@ class CarlaSimulator(SimulatorBackend):
                 f"could not plan a route of {spec.route_length_m:.0f} m from the chosen "
                 f"spawn point in {spec.town}"
             )
+        self._destination = best_end
         return RouteTracker(best)
 
     # ── actors ───────────────────────────────────────────────────────────────
@@ -581,6 +607,9 @@ class CarlaSimulator(SimulatorBackend):
             except Exception:
                 pass
             self._vehicle = None
+        # Cleared with the vehicle: a destination left over from the previous
+        # Episode would send a self-planning Policy somewhere off this route.
+        self._destination = None
 
         while not self._image_queue.empty():
             try:

@@ -144,9 +144,13 @@ def run_episode(
         telemetry_sink: Called once per frame with a warehouse-shaped row.
             Exceptions from it are swallowed — telemetry must never abort a run.
         worker_id: Recorded in telemetry for attribution.
-        model_version: Planner identifier, recorded so results can be compared
-            across model versions.
-        dataset_version: Data the planner trained on, recorded for provenance.
+        model_version: Planner identifier. Accepted for attribution but **not
+            yet written anywhere**: the frame schema in ``cloud/warehouse.py``
+            has no such column, and nothing writes the episode table that does.
+            Callers pass it so the value exists at the point that knows it; the
+            gRPC ``EpisodeResult`` is currently the only place it reaches.
+        dataset_version: Data the planner trained on. Same standing as
+            ``model_version``.
 
     Returns:
         The scored episode. A simulator failure produces a ``status="failed"``
