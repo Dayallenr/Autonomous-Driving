@@ -39,7 +39,19 @@ from typing import Protocol
 
 from pathfinder.sim.base import FrameState
 
-__all__ = ["PerceivedScene", "Perception"]
+__all__ = ["PerceivedScene", "Perception", "perception_name"]
+
+
+def perception_name(perception: Perception) -> str:
+    """The provenance identifier a perception stamps onto frames.
+
+    One derivation, shared by ``ModularPolicy`` (which writes it into
+    telemetry) and the ablation runner (which pre-checks it before spending
+    hours of simulation) — two copies of this expression could drift, and the
+    drift would surface as a mid-run RuntimeError instead of a startup error.
+    A Perception that declares no ``NAME`` is still identifiable by class.
+    """
+    return getattr(perception, "NAME", type(perception).__name__)
 
 
 @dataclass(frozen=True)

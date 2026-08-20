@@ -808,3 +808,14 @@ def test_frame_schema_carries_perception_provenance(tmp_path):
     # The partition key must stay the last column: both DDL generators and the
     # writer's directory layout key off it.
     assert FRAME_COLUMNS[-1].name == "event_date"
+
+
+def test_build_simulator_rejects_kwargs_for_auto():
+    """Backend kwargs are backend-specific, so 'auto' forwarding them would
+    either crash or silently drop them depending on what the fallback picked."""
+    with pytest.raises(ValueError, match="auto"):
+        build_simulator("auto", render=True)
+
+
+def test_build_simulator_forwards_kwargs_to_the_kinematic_backend():
+    assert build_simulator("kinematic", render=True).render is True

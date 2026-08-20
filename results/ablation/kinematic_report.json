@@ -1,0 +1,219 @@
+{
+  "kind": "perception_ablation",
+  "generated_at": "2026-08-20T08:12:06+00:00",
+  "backend": "kinematic",
+  "scope": "pipeline-only",
+  "scope_note": "Generated on the kinematic backend, which neither simulates real physics nor renders real scenes. These numbers verify the ablation pipeline end to end; they are not driving quality and must never be quoted as such. The real measurement comes from the CARLA backend.",
+  "perception_boundary": "perceived obstacles, privileged localization and traffic lights",
+  "controller": "pure_pursuit",
+  "episodes": [
+    {
+      "episode_id": "ep-0000",
+      "town": "Town01",
+      "weather": "ClearNoon",
+      "route_length_m": 300.0,
+      "seed": 1000,
+      "max_steps": 500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0001",
+      "town": "Town03",
+      "weather": "ClearSunset",
+      "route_length_m": 300.0,
+      "seed": 1001,
+      "max_steps": 500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    },
+    {
+      "episode_id": "ep-0002",
+      "town": "Town05",
+      "weather": "HardRainNoon",
+      "route_length_m": 300.0,
+      "seed": 1002,
+      "max_steps": 500,
+      "delta_seconds": 0.05,
+      "traffic_density": 0.3,
+      "pedestrian_density": 0.15
+    }
+  ],
+  "baseline": {
+    "perception": "privileged",
+    "summary": {
+      "episodes": 3,
+      "driving_score": 48.3,
+      "route_completion": 0.483,
+      "infraction_penalty": 1.0,
+      "collisions_per_km": 0.0,
+      "total_distance_km": 0.43,
+      "mean_fps": 1812.0,
+      "failures": 0,
+      "infraction_totals": {}
+    },
+    "mean_perception_latency_ms": 0.0,
+    "episodes": [
+      {
+        "perception": "privileged",
+        "seed": 1000,
+        "episode_id": "ep-0000",
+        "route_completion": 0.5221,
+        "infraction_penalty": 1.0,
+        "driving_score": 52.21,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {},
+        "distance_travelled_m": 156.6,
+        "route_length_m": 300.0,
+        "frames": 500,
+        "duration_seconds": 0.27,
+        "mean_fps": 1832.6,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1001,
+        "episode_id": "ep-0001",
+        "route_completion": 0.4201,
+        "infraction_penalty": 1.0,
+        "driving_score": 42.01,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {},
+        "distance_travelled_m": 126.0,
+        "route_length_m": 300.0,
+        "frames": 500,
+        "duration_seconds": 0.28,
+        "mean_fps": 1774.1,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "privileged",
+        "seed": 1002,
+        "episode_id": "ep-0002",
+        "route_completion": 0.5069,
+        "infraction_penalty": 1.0,
+        "driving_score": 50.69,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {},
+        "distance_travelled_m": 152.1,
+        "route_length_m": 300.0,
+        "frames": 500,
+        "duration_seconds": 0.27,
+        "mean_fps": 1830.5,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      }
+    ]
+  },
+  "candidate": {
+    "perception": "detector",
+    "summary": {
+      "episodes": 3,
+      "driving_score": 48.26,
+      "route_completion": 0.4826,
+      "infraction_penalty": 1.0,
+      "collisions_per_km": 0.0,
+      "total_distance_km": 0.43,
+      "mean_fps": 10.2,
+      "failures": 0,
+      "infraction_totals": {}
+    },
+    "mean_perception_latency_ms": 97.433,
+    "episodes": [
+      {
+        "perception": "detector",
+        "seed": 1000,
+        "episode_id": "ep-0000",
+        "route_completion": 0.5221,
+        "infraction_penalty": 1.0,
+        "driving_score": 52.21,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {},
+        "distance_travelled_m": 156.6,
+        "route_length_m": 300.0,
+        "frames": 500,
+        "duration_seconds": 49.96,
+        "mean_fps": 10.0,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1001,
+        "episode_id": "ep-0001",
+        "route_completion": 0.4189,
+        "infraction_penalty": 1.0,
+        "driving_score": 41.89,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {},
+        "distance_travelled_m": 125.7,
+        "route_length_m": 300.0,
+        "frames": 500,
+        "duration_seconds": 48.6,
+        "mean_fps": 10.3,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      },
+      {
+        "perception": "detector",
+        "seed": 1002,
+        "episode_id": "ep-0002",
+        "route_completion": 0.5069,
+        "infraction_penalty": 1.0,
+        "driving_score": 50.69,
+        "collisions": 0,
+        "lane_invasions": 0,
+        "red_lights_run": 0,
+        "infractions": {},
+        "distance_travelled_m": 152.1,
+        "route_length_m": 300.0,
+        "frames": 500,
+        "duration_seconds": 48.66,
+        "mean_fps": 10.3,
+        "status": "completed",
+        "termination_reason": "max steps reached"
+      }
+    ]
+  },
+  "difference": {
+    "definition": "baseline minus candidate, in each metric's own units; positive means the candidate's perception cost driving performance. Deltas for episodes listed in failed_episodes measure a mid-run failure, not perception, and must be excluded from any perception-cost claim.",
+    "failed_episodes": [],
+    "driving_score": 0.04,
+    "route_completion": 0.0004,
+    "infraction_penalty": 0.0,
+    "per_episode_driving_score": [
+      {
+        "episode_id": "ep-0000",
+        "baseline": 52.21,
+        "candidate": 52.21,
+        "delta": 0.0
+      },
+      {
+        "episode_id": "ep-0001",
+        "baseline": 42.01,
+        "candidate": 41.89,
+        "delta": 0.12
+      },
+      {
+        "episode_id": "ep-0002",
+        "baseline": 50.69,
+        "candidate": 50.69,
+        "delta": 0.0
+      }
+    ]
+  }
+}

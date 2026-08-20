@@ -108,6 +108,13 @@ class DetectorPerception:
         self._detector = detector
         self._camera = camera
 
+    @property
+    def camera(self) -> CameraGeometry:
+        """The geometry ranges are derived with. Public so a caller pairing
+        this perception with a simulator can check the two match — a wrong
+        camera scales every range silently, which no downstream test catches."""
+        return self._camera
+
     def perceive(self, state: FrameState) -> PerceivedScene:
         if state.image is None:
             # The backend is not rendering — a configuration mistake, since

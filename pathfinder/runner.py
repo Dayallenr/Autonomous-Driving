@@ -78,6 +78,11 @@ class PurePursuitPolicy:
       acceleration.
     """
 
+    #: Registry and telemetry name. ``pathfinder.policies.PURE_PURSUIT`` reads
+    #: this, so a result labelled from the registry and telemetry stamped from
+    #: an instance agree on what drove.
+    NAME = "pure_pursuit"
+
     def __init__(
         self,
         *,

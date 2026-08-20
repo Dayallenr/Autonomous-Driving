@@ -270,3 +270,21 @@ def test_an_impossible_camera_is_rejected(field, value):
     settings[field] = value
     with pytest.raises(ValueError):
         CameraGeometry(**settings)
+
+
+def test_carla_camera_geometry_matches_its_spawn_configuration():
+    """The CARLA backend spawns a 200x88 camera with a 90-degree FOV at 2.4 m;
+    CARLA_CAMERA must be that camera, derived rather than retyped. A 90-degree
+    horizontal FOV pins the focal length to exactly half the image width."""
+    from pathfinder.sim.carla_backend import CARLA_CAMERA
+
+    assert CARLA_CAMERA.focal_px == pytest.approx(CARLA_CAMERA.image_width_px / 2.0)
+    assert CARLA_CAMERA.camera_height_m == 2.4
+    assert (CARLA_CAMERA.image_width_px, CARLA_CAMERA.image_height_px) == (
+        KINEMATIC_CAMERA.image_width_px,
+        KINEMATIC_CAMERA.image_height_px,
+    )
+    # Higher camera, shorter focal length: the two effects compound, so the
+    # near-field floor sits further out than the kinematic camera's. Worth
+    # knowing, not asserting a value for: it follows from the geometry above.
+    assert CARLA_CAMERA.min_measurable_range_m > KINEMATIC_CAMERA.min_measurable_range_m
