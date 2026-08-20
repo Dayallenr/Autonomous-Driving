@@ -254,11 +254,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("report", type=Path, help="path to a perception_ablation JSON report")
     args = parser.parse_args(argv)
 
-    report = json.loads(args.report.read_text())
+    report = json.loads(args.report.read_text(encoding="utf-8"))
     if report.get("kind") != "perception_ablation":
         raise SystemExit(f"{args.report} is not a perception_ablation report")
     output = args.report.with_suffix(".md")
-    output.write_text(render_writeup(report, source=str(args.report)))
+    # See the note in ablation.py: the rendered write-up is not ASCII, and
+    # write_text without an explicit encoding uses cp1252 on Windows.
+    output.write_text(render_writeup(report, source=str(args.report)), encoding="utf-8")
     print(f"write-up written to {output}")
     return 0
 

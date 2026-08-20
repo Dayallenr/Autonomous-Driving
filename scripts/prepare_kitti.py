@@ -105,7 +105,7 @@ def load_labels(root: Path) -> tuple[dict[int, list[int]], dict[int, Path]]:
             if not image_path.exists():
                 raise ValueError(f"label {label_path} has no matching image at {image_path}")
             labels[index] = [
-                int(line.split()[0]) for line in label_path.read_text().splitlines() if line.strip()
+                int(line.split()[0]) for line in label_path.read_text(encoding="utf-8").splitlines() if line.strip()
             ]
             images[index] = image_path
 

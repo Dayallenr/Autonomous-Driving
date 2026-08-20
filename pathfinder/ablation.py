@@ -395,19 +395,23 @@ def main(argv: list[str] | None = None) -> int:
     partial.unlink(missing_ok=True)
 
     def checkpoint(perception: str, score) -> None:
-        with partial.open("a") as handle:
+        with partial.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps({"perception": perception, **score.to_dict()}) + "\n")
 
     with build_simulator(args.backend, **simulator_kwargs) as simulator:
         report = run_ablation(simulator, specs, candidate=candidate, on_episode=checkpoint)
 
-    output.write_text(json.dumps(report, indent=2) + "\n")
+    output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     partial.unlink(missing_ok=True)
 
     # The write-up lands with the report so a CARLA sitting can never end with
     # numbers but no document stating what they are allowed to mean.
     writeup = output.with_suffix(".md")
-    writeup.write_text(render_writeup(report, source=str(output)))
+    # encoding="utf-8" is not optional: write_text defaults to the locale
+    # encoding, which is cp1252 on Windows, and the rendered write-up contains
+    # U+2212 MINUS SIGN. Without it a finished 20-episode CARLA run dies at the
+    # last line and leaves an empty .md beside a valid .json.
+    writeup.write_text(render_writeup(report, source=str(output)), encoding="utf-8")
 
     print(f"backend: {report['backend']} ({report['scope']})")
     print(f"baseline  {report['baseline']['perception']:>12}: "

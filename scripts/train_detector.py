@@ -45,7 +45,7 @@ logger = logging.getLogger("train_detector")
 
 def load_val_support(root: Path) -> dict[str, dict]:
     """Per-class instances/images/drives over the validation split."""
-    manifest = json.loads((root / "manifest.json").read_text())
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     val_drives = set(manifest["split"]["val_drives"])
 
     index = load_drive_index(root / "raw" / "train_mapping.txt", root / "raw" / "train_rand.txt")
@@ -53,7 +53,7 @@ def load_val_support(root: Path) -> dict[str, dict]:
     for split in ("train", "val"):
         for label_path in (root / "raw" / "labels" / split).glob("*.txt"):
             labels[int(label_path.stem)] = [
-                int(line.split()[0]) for line in label_path.read_text().splitlines() if line.strip()
+                int(line.split()[0]) for line in label_path.read_text(encoding="utf-8").splitlines() if line.strip()
             ]
 
     val_frames = {

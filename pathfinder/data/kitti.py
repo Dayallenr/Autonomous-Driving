@@ -115,11 +115,11 @@ def load_drive_index(mapping_path: Path, rand_path: Path) -> DriveIndex:
             frames, or an index points outside the mapping. Both would silently
             corrupt provenance, so they are checked rather than trusted.
     """
-    mapping = mapping_path.read_text().splitlines()
+    mapping = mapping_path.read_text(encoding="utf-8").splitlines()
     if len(mapping) != NUM_FRAMES:
         raise ValueError(f"{mapping_path.name} has {len(mapping)} lines, expected {NUM_FRAMES}")
 
-    raw = rand_path.read_text().replace("\n", "").strip().strip(",")
+    raw = rand_path.read_text(encoding="utf-8").replace("\n", "").strip().strip(",")
     order = [int(token) for token in raw.split(",")]
     if len(order) != NUM_FRAMES:
         raise ValueError(f"{rand_path.name} has {len(order)} entries, expected {NUM_FRAMES}")
