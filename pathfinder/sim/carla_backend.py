@@ -15,12 +15,12 @@ Leaderboard metric. Each of those is load-bearing:
 * **A route**, not free driving. Route completion is half the driving score, and
   it is meaningless without a defined route to complete. Geometry lives in
   :mod:`pathfinder.sim.route` so it is testable without a simulator.
-* **Navigation commands** derived from the route's ``RoadOption``s. The planner
+* **Navigation commands** derived from the route's ``RoadOption``s. The policy
   has four branches; feeding it a constant ``FOLLOW_LANE`` leaves three of them
   untrained and makes per-branch infraction analysis impossible.
 * **Traffic**, because a benchmark in an empty town measures lane keeping.
   Collision, occlusion, and yielding only exist when something else is moving.
-* **A camera**, because the planner is a vision policy. Without pixels it cannot
+* **A camera**, because the policy is a vision model. Without pixels it cannot
   run at all.
 
 Synchronous mode
@@ -28,7 +28,7 @@ Synchronous mode
 The world runs in synchronous mode with a fixed delta. Asynchronously the server
 ticks on its own clock, so a slow perception step means the control loop acts on
 stale state and the episode is not reproducible. Benchmarking that way measures
-the host's spare capacity as much as the planner. Settings are server-global, so
+the host's spare capacity as much as the policy. Settings are server-global, so
 the originals are restored on ``close`` — leaving a shared CARLA in synchronous
 mode hangs every other client waiting for ticks that never come.
 
@@ -75,12 +75,12 @@ _WEATHER_PRESETS = (
 ROUTE_RESOLUTION_M = 2.0
 
 #: Seconds below :data:`STOPPED_SPEED_MPS` before the episode is abandoned. The
-#: Leaderboard uses a comparable blocked-agent timeout; without one a planner
+#: Leaderboard uses a comparable blocked-agent timeout; without one a policy
 #: that stalls forever consumes a worker for the whole run.
 BLOCKED_TIMEOUT_S = 30.0
 STOPPED_SPEED_MPS = 0.1
 
-#: Range within which a traffic light is reported to the planner.
+#: Range within which a traffic light is reported to the policy.
 TRAFFIC_LIGHT_RANGE_M = 30.0
 
 
@@ -209,7 +209,7 @@ class CarlaSimulator(SimulatorBackend):
         ensure_agents_importable(raise_on_missing=True)
         from agents.navigation.global_route_planner import GlobalRoutePlanner
 
-        planner = GlobalRoutePlanner(self._world.get_map(), ROUTE_RESOLUTION_M)
+        route_planner = GlobalRoutePlanner(self._world.get_map(), ROUTE_RESOLUTION_M)
         spawn_points = self._world.get_map().get_spawn_points()
 
         # Try destinations in a seeded order and keep the first route long
@@ -224,7 +224,7 @@ class CarlaSimulator(SimulatorBackend):
             if destination.location.distance(start.location) < spec.route_length_m * 0.5:
                 continue
             try:
-                plan = planner.trace_route(start.location, destination.location)
+                plan = route_planner.trace_route(start.location, destination.location)
             except Exception as error:  # topology gaps raise rather than return empty
                 logger.debug("route planning failed for a destination: %s", error)
                 continue
@@ -243,7 +243,7 @@ class CarlaSimulator(SimulatorBackend):
             if len(points) > len(best):
                 best = points
                 # The waypoint's own location, not the sampled spawn point: the
-                # planner ends at the nearest waypoint to the destination, and
+                # route planner ends at the nearest waypoint to the destination, and
                 # a Policy aiming at the spawn point instead would think it had
                 # further to go than the route actually covers.
                 best_end = plan[-1][0].transform.location

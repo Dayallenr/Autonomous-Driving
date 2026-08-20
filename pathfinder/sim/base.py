@@ -124,8 +124,8 @@ class FrameState:
     lookahead_curvature: float = 0.0
     #: State of the next traffic light ahead: "red", "green", or "" when none is
     #: within sensing range. A real stack perceives these; without exposing them
-    #: the planner cannot avoid a red-light infraction and the metric measures
-    #: the simulator's omission rather than the planner.
+    #: the policy cannot avoid a red-light infraction and the metric measures
+    #: the simulator's omission rather than the policy.
     traffic_light_state: str = ""
     #: Distance to that light in metres; inf when none is in range.
     traffic_light_distance_m: float = float("inf")

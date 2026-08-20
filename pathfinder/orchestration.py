@@ -36,8 +36,8 @@ from dataclasses import dataclass, field
 
 from pathfinder.cloud.queue import MessageQueue
 from pathfinder.metrics.driving_score import BenchmarkSummary, EpisodeScore, aggregate
-from pathfinder.planners import DEFAULT_PLANNER, build_planner, result_label
-from pathfinder.runner import Planner, run_episode
+from pathfinder.policies import DEFAULT_POLICY, build_policy, result_label
+from pathfinder.runner import Policy, run_episode
 from pathfinder.sim.base import EpisodeSpec
 from pathfinder.sim.carla_backend import build_simulator
 
@@ -120,7 +120,7 @@ class EpisodeWorker:
         worker_id: str,
         queue: MessageQueue,
         *,
-        planner_name: str = DEFAULT_PLANNER,
+        policy_name: str = DEFAULT_POLICY,
         simulator_backend: str = "auto",
         telemetry_sink=None,
         model_version: str | None = None,
@@ -129,10 +129,10 @@ class EpisodeWorker:
     ) -> None:
         self.worker_id = worker_id
         self.queue = queue
-        self.planner_name = planner_name
+        self.policy_name = policy_name
         self.simulator_backend = simulator_backend
         self.telemetry_sink = telemetry_sink
-        self.model_version = result_label(planner_name, model_version)
+        self.model_version = result_label(policy_name, model_version)
         self.dataset_version = dataset_version
         self.idle_timeout_seconds = idle_timeout_seconds
 
@@ -154,7 +154,7 @@ class EpisodeWorker:
             # mismatched pair still restores a CARLA server to async mode on the
             # way out. Anything misconfigured raises here, before a single
             # message leaves the queue.
-            planner: Planner = build_planner(self.planner_name, simulator=simulator)
+            policy: Policy = build_policy(self.policy_name, simulator=simulator)
             while not self._stop.is_set():
                 messages = self.queue.receive(max_messages=1, wait_seconds=0.2)
                 if not messages:
@@ -175,7 +175,7 @@ class EpisodeWorker:
                     score = run_episode(
                         simulator,
                         spec,
-                        planner,
+                        policy,
                         telemetry_sink=self.telemetry_sink,
                         worker_id=self.worker_id,
                         model_version=self.model_version,
@@ -207,17 +207,17 @@ class BenchmarkCoordinator:
         self,
         queue: MessageQueue,
         *,
-        planner_name: str = DEFAULT_PLANNER,
+        policy_name: str = DEFAULT_POLICY,
         simulator_backend: str = "auto",
         telemetry_sink=None,
         model_version: str | None = None,
         dataset_version: str = "",
     ) -> None:
         self.queue = queue
-        self.planner_name = planner_name
+        self.policy_name = policy_name
         self.simulator_backend = simulator_backend
         self.telemetry_sink = telemetry_sink
-        self.model_version = result_label(planner_name, model_version)
+        self.model_version = result_label(policy_name, model_version)
         self.dataset_version = dataset_version
 
     def run(self, specs: list[EpisodeSpec], *, workers: int = 4) -> BenchmarkRun:
@@ -240,7 +240,7 @@ class BenchmarkCoordinator:
             EpisodeWorker(
                 f"worker-{index}",
                 self.queue,
-                planner_name=self.planner_name,
+                policy_name=self.policy_name,
                 simulator_backend=self.simulator_backend,
                 telemetry_sink=self.telemetry_sink,
                 model_version=self.model_version,

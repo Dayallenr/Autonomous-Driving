@@ -5,7 +5,7 @@ Vehicle model
 -------------
 A kinematic bicycle model. It is the standard low-speed approximation and it is
 the right level of fidelity here: it reproduces the constraint that actually
-shapes a planner's behaviour — that a car cannot translate sideways, and that
+shapes a policy's behaviour — that a car cannot translate sideways, and that
 turn radius is bounded by steering angle and wheelbase — without pretending to
 model tyre slip, weight transfer, or suspension.
 
@@ -57,7 +57,7 @@ LANE_HALF_WIDTH_M = 1.75
 OFF_ROAD_DISTANCE_M = 3.5
 
 # An agent that has not moved for this long is stuck. CARLA's leaderboard uses
-# the same idea: without it, a planner that simply stops would never terminate
+# the same idea: without it, a policy that simply stops would never terminate
 # and would score a perfect zero-infraction run.
 BLOCKED_SPEED_MPS = 0.1
 BLOCKED_SECONDS = 20.0
@@ -76,7 +76,7 @@ class _Obstacle:
     traffic, any obstacle in the ego's lane blocks it permanently, the ego
     brakes to a stop, and every episode ends in ``agent_blocked``. The benchmark
     then measures nothing except that the ego can brake. Moving traffic makes
-    car-following the actual task, which is what the planner should be scored on.
+    car-following the actual task, which is what the policy should be scored on.
     """
 
     distance_along_route_m: float
@@ -162,7 +162,7 @@ class KinematicSimulator(SimulatorBackend):
 
         Generating everything at reset (rather than lazily as the ego advances)
         is what makes the episode a pure function of the seed: lazy generation
-        would couple the layout to the trajectory, so a planner change would
+        would couple the layout to the trajectory, so a policy change would
         silently change the scenario it is being evaluated on.
         """
         assert self._rng is not None
@@ -265,7 +265,7 @@ class KinematicSimulator(SimulatorBackend):
 
         Cross-track error is the ego offset projected onto the reference path's
         normal at the ego's arc length. This is a genuine tracking error, so a
-        planner that steers badly accumulates it and eventually leaves the lane.
+        policy that steers badly accumulates it and eventually leaves the lane.
         """
         reference_x, reference_y, reference_yaw = self._reference_at(self._distance)
         dx, dy = self._x - reference_x, self._y - reference_y
@@ -345,7 +345,7 @@ class KinematicSimulator(SimulatorBackend):
         )
 
     def _render_image(self, lateral, heading_error, curvature, light_state, light_distance):
-        """Render the forward view for the CIL planner."""
+        """Render the forward view for the CIL policy."""
         relative = [
             (
                 obstacle.distance_along_route_m - self._distance,
@@ -367,7 +367,7 @@ class KinematicSimulator(SimulatorBackend):
         if self._spec is None:
             raise RuntimeError("step() called before reset()")
 
-        # Clamp rather than reject: a planner producing out-of-range controls is
+        # Clamp rather than reject: a policy producing out-of-range controls is
         # a bug worth surviving, and the simulator saturating is what real
         # actuators do anyway.
         throttle = min(max(throttle, 0.0), 1.0)

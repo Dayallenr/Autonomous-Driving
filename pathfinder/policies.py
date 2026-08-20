@@ -18,23 +18,18 @@ downstream has to remember to add a caveat.
 Why an adapter rather than a new seam
 -------------------------------------
 CARLA's ``BehaviorAgent`` drives an actor and returns a ``carla.VehicleControl``;
-:class:`~pathfinder.runner.Planner` takes a :class:`FrameState` and returns a
+:class:`~pathfinder.runner.Policy` takes a :class:`FrameState` and returns a
 :class:`ControlOutput`. The two do not line up, but the mismatch is entirely
 about *where the state comes from* — the agent reads the world itself instead of
 being told about it. So the adapter is constructed with the simulator and takes
-the ego actor and route destination from it. The runner, the ``Planner``
+the ego actor and route destination from it. The runner, the ``Policy``
 protocol, and :class:`SimulatorBackend` are all untouched.
 
 CARLA imports are deferred until the first :meth:`plan` call, so importing this
 module — and therefore selecting any other Policy — works on a machine with no
 CARLA installed.
 
-A naming note
--------------
-``CONTEXT.md`` calls this concept a **Policy**; the code has called the interface
-``Planner`` since before that glossary existed. Prose here follows the glossary
-and identifiers follow the surrounding code. The drift is real and is flagged on
-the parent issue for a deliberate decision — it is not settled here.
+The interface used to be called ``Planner``; ADR-0002 records why it is not.
 """
 from __future__ import annotations
 
@@ -42,18 +37,18 @@ import logging
 import time
 from collections.abc import Callable
 
-from pathfinder.runner import ControlOutput, Planner, PurePursuitPlanner
+from pathfinder.runner import ControlOutput, Policy, PurePursuitPolicy
 from pathfinder.sim.base import FrameState
 from pathfinder.sim.carla_paths import ensure_agents_importable
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "DEFAULT_PLANNER",
-    "PLANNER_NAMES",
+    "DEFAULT_POLICY",
+    "POLICY_NAMES",
     "PURE_PURSUIT",
-    "CarlaBehaviorAgentPlanner",
-    "build_planner",
+    "CarlaBehaviorAgentPolicy",
+    "build_policy",
     "result_label",
 ]
 
@@ -61,7 +56,7 @@ __all__ = [
 PURE_PURSUIT = "pure_pursuit"
 
 #: What every entry point selects when nothing is asked for.
-DEFAULT_PLANNER = PURE_PURSUIT
+DEFAULT_POLICY = PURE_PURSUIT
 
 #: Sentinel for "this backend has no such attribute at all", which is a
 #: different mistake from "it has one and it is empty".
@@ -85,8 +80,8 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, float(value)))
 
 
-class CarlaBehaviorAgentPlanner:
-    """CARLA's built-in behaviour agent, adapted to the ``Planner`` protocol.
+class CarlaBehaviorAgentPolicy:
+    """CARLA's built-in behaviour agent, adapted to the ``Policy`` protocol.
 
     Args:
         simulator: The CARLA backend the Episode runs in. Read for the ego actor
@@ -178,34 +173,34 @@ class CarlaBehaviorAgentPlanner:
         return self._agent
 
 
-def _build_pure_pursuit(simulator, **kwargs) -> Planner:
+def _build_pure_pursuit(simulator, **kwargs) -> Policy:
     """The geometric controller reads only the ``FrameState`` it is handed, so
     the simulator is of no interest to it."""
-    return PurePursuitPlanner(**kwargs)
+    return PurePursuitPolicy(**kwargs)
 
 
-def _build_carla_behavior_agent(simulator, **kwargs) -> Planner:
+def _build_carla_behavior_agent(simulator, **kwargs) -> Policy:
     if simulator is None:
         raise ValueError(
-            f"{CarlaBehaviorAgentPlanner.NAME} drives the simulator's own ego actor, "
-            "so it needs the simulator it will run in: build_planner(name, simulator=...)"
+            f"{CarlaBehaviorAgentPolicy.NAME} drives the simulator's own ego actor, "
+            "so it needs the simulator it will run in: build_policy(name, simulator=...)"
         )
-    return CarlaBehaviorAgentPlanner(simulator, **kwargs)
+    return CarlaBehaviorAgentPolicy(simulator, **kwargs)
 
 
 #: Selectable Policies. ``pure_pursuit`` is the project's geometric controller;
 #: ``carla_builtin_behavior_agent`` is CARLA's own behaviour agent, kept as a
 #: labelled reference rather than as project work. One table rather than a name
 #: list beside a matching if-cascade, so a new Policy is one edit.
-_BUILDERS: dict[str, Callable[..., Planner]] = {
+_BUILDERS: dict[str, Callable[..., Policy]] = {
     PURE_PURSUIT: _build_pure_pursuit,
-    CarlaBehaviorAgentPlanner.NAME: _build_carla_behavior_agent,
+    CarlaBehaviorAgentPolicy.NAME: _build_carla_behavior_agent,
 }
 
-PLANNER_NAMES: tuple[str, ...] = tuple(_BUILDERS)
+POLICY_NAMES: tuple[str, ...] = tuple(_BUILDERS)
 
 
-def result_label(planner_name: str, model_version: str | None) -> str:
+def result_label(policy_name: str, model_version: str | None) -> str:
     """What to record as the thing that drove an Episode.
 
     Defaults to the Policy's registered name, so a result is labelled with
@@ -213,15 +208,15 @@ def result_label(planner_name: str, model_version: str | None) -> str:
     Policies that are not project work. An explicit label still wins, because
     trained weights have a version their Policy's name does not carry.
     """
-    return planner_name if model_version is None else model_version
+    return policy_name if model_version is None else model_version
 
 
-def build_planner(name: str = DEFAULT_PLANNER, *, simulator=None, **kwargs) -> Planner:
+def build_policy(name: str = DEFAULT_POLICY, *, simulator=None, **kwargs) -> Policy:
     """Construct a Policy by name, mirroring
     :func:`~pathfinder.sim.carla_backend.build_simulator`.
 
     Args:
-        name: One of :data:`PLANNER_NAMES`.
+        name: One of :data:`POLICY_NAMES`.
         simulator: Required by Policies that read the simulator directly.
         **kwargs: Passed to the Policy's constructor.
 
@@ -232,6 +227,6 @@ def build_planner(name: str = DEFAULT_PLANNER, *, simulator=None, **kwargs) -> P
     builder = _BUILDERS.get(name.strip().lower())
     if builder is None:
         raise ValueError(
-            f"unknown planner {name!r}; expected one of {', '.join(PLANNER_NAMES)}"
+            f"unknown policy {name!r}; expected one of {', '.join(POLICY_NAMES)}"
         )
     return builder(simulator, **kwargs)

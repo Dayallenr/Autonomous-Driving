@@ -48,7 +48,7 @@ def note(message: str) -> None:
 def stage_simulator() -> None:
     header(1, "Simulator — kinematic backend with forward-view rendering")
 
-    from pathfinder.runner import PurePursuitPlanner, run_episode
+    from pathfinder.runner import PurePursuitPolicy, run_episode
     from pathfinder.sim import EpisodeSpec, KinematicSimulator, carla_available
 
     print(f"   CARLA available on this machine: {carla_available()}")
@@ -59,7 +59,7 @@ def stage_simulator() -> None:
 
     simulator = KinematicSimulator(render=True)
     spec = EpisodeSpec(episode_id="demo-0", route_length_m=400, max_steps=1500, seed=42)
-    score = run_episode(simulator, spec, PurePursuitPlanner())
+    score = run_episode(simulator, spec, PurePursuitPolicy())
     simulator.close()
 
     print(f"\n   episode {spec.episode_id}: {spec.town} / {spec.weather} / {spec.route_length_m:.0f} m")
@@ -69,7 +69,7 @@ def stage_simulator() -> None:
 
     # Determinism is what makes a distributed benchmark reproducible.
     simulator = KinematicSimulator()
-    repeat = run_episode(simulator, spec, PurePursuitPlanner())
+    repeat = run_episode(simulator, spec, PurePursuitPolicy())
     simulator.close()
     identical = abs(repeat.driving_score - score.driving_score) < 1e-9
     print(f"\n   re-running the same seed gives an identical score: "
@@ -207,9 +207,9 @@ def stage_telemetry(telemetry_stream, workspace: Path) -> None:
     print(f"\n   read back {combined.num_rows:,} rows, {combined.num_columns} columns")
 
     # The kind of query the offline-regression dashboard runs.
-    print(f"\n   {DIM}query: planner latency and speed by navigation command{RESET}")
+    print(f"\n   {DIM}query: policy latency and speed by navigation command{RESET}")
     commands = combined.column("command").to_pylist()
-    latencies = combined.column("planner_latency_ms").to_pylist()
+    latencies = combined.column("policy_latency_ms").to_pylist()
     speeds = combined.column("speed_mps").to_pylist()
     names = {0: "FOLLOW_LANE", 1: "TURN_LEFT", 2: "TURN_RIGHT", 3: "GO_STRAIGHT"}
 

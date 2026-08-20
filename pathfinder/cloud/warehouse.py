@@ -6,8 +6,8 @@ This is the offline-analysis half of the telemetry pipeline. The stream
 storage where regression questions are cheap to ask:
 
 * "Did collision rate get worse between model v3 and v4 on Town05?"
-* "Which route segments have the highest planner disagreement?"
-* "What is the p99 planner latency by weather preset?"
+* "Which route segments have the highest policy disagreement?"
+* "What is the p99 policy latency by weather preset?"
 
 None of those are answerable against a JSONL stream without a full scan, and all
 of them are a partition-pruned column read against Parquet.
@@ -73,9 +73,15 @@ FRAME_COLUMNS: tuple[Column, ...] = (
     Column("command", "int64", "SMALLINT", "int", "CIL branch index 0..3"),
     Column("detections", "int64", "INTEGER", "int", "objects detected this frame"),
     Column("nearest_object_m", "double", "DOUBLE PRECISION", "double", "range to closest object"),
-    Column("planner_latency_ms", "double", "DOUBLE PRECISION", "double", "planning step cost"),
+    Column("policy_latency_ms", "double", "DOUBLE PRECISION", "double", "policy step cost"),
     Column("perception_latency_ms", "double", "DOUBLE PRECISION", "double", "detector cost"),
     Column("infraction", "string", "VARCHAR(32)", "string", "empty when none"),
+    # Provenance, repeated on every frame. It duplicates across a whole episode,
+    # which Parquet's dictionary encoding costs almost nothing for, and it is
+    # what stops a frame from being read as evidence about a policy that did not
+    # produce it — including the CARLA baseline, which is not project work.
+    Column("model_version", "string", "VARCHAR(64)", "string", "policy that drove this frame"),
+    Column("dataset_version", "string", "VARCHAR(64)", "string", "data that policy trained on"),
     Column("event_date", "string", "VARCHAR(10)", "string", "YYYY-MM-DD partition key"),
 )
 
@@ -83,7 +89,7 @@ FRAME_COLUMNS: tuple[Column, ...] = (
 EPISODE_COLUMNS: tuple[Column, ...] = (
     Column("episode_id", "string", "VARCHAR(64)", "string", "primary key"),
     Column("worker_id", "string", "VARCHAR(64)", "string", "which worker ran it"),
-    Column("model_version", "string", "VARCHAR(64)", "string", "planner weights identifier"),
+    Column("model_version", "string", "VARCHAR(64)", "string", "policy weights identifier"),
     Column("dataset_version", "string", "VARCHAR(64)", "string", "data those weights trained on"),
     Column("town", "string", "VARCHAR(32)", "string", "CARLA map"),
     Column("weather", "string", "VARCHAR(32)", "string", "weather preset"),

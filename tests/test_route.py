@@ -152,7 +152,7 @@ def test_index_does_not_jump_past_the_search_window():
 
 
 def test_command_comes_from_the_lookahead_not_the_current_point():
-    """A planner told 'turn left' once it is already in the junction cannot act."""
+    """A policy told 'turn left' once it is already in the junction cannot act."""
     points = straight_route(100)
     points = [
         RoutePoint(p.x, p.y, p.yaw_rad, Command.TURN_LEFT if i >= 20 else Command.FOLLOW_LANE)

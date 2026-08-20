@@ -42,7 +42,7 @@ __all__ = [
 #: it, because a car 30 m off course is not driving the route being scored.
 ROUTE_DEVIATION_M = 30.0
 
-#: CARLA ``RoadOption`` names mapped onto the planner's four branches. Held as
+#: CARLA ``RoadOption`` names mapped onto the policy's four branches. Held as
 #: strings so this module never imports CARLA.
 _ROAD_OPTION_TO_COMMAND = {
     "LANEFOLLOW": Command.FOLLOW_LANE,
@@ -50,7 +50,7 @@ _ROAD_OPTION_TO_COMMAND = {
     "RIGHT": Command.TURN_RIGHT,
     "STRAIGHT": Command.GO_STRAIGHT,
     # A lane change is not a junction manoeuvre. Mapping it to TURN_* would feed
-    # the planner's turn branches examples of lane changes, which is a different
+    # the policy's turn branches examples of lane changes, which is a different
     # behaviour with a different steering profile.
     "CHANGELANELEFT": Command.FOLLOW_LANE,
     "CHANGELANERIGHT": Command.FOLLOW_LANE,
@@ -59,7 +59,7 @@ _ROAD_OPTION_TO_COMMAND = {
 
 
 def road_option_to_command(road_option: object) -> Command:
-    """Map a CARLA ``RoadOption`` (or its name) onto a planner branch.
+    """Map a CARLA ``RoadOption`` (or its name) onto a policy branch.
 
     Unknown options fall back to ``FOLLOW_LANE`` rather than raising: a new
     enum member in a future CARLA should degrade to lane following, not abort a
@@ -87,7 +87,7 @@ class RouteTracker:
     Args:
         points: Ordered route waypoints, roughly evenly spaced.
         lookahead_m: Distance ahead used for curvature and the active command.
-            The command must lead the vehicle — a planner told "turn left" only
+            The command must lead the vehicle — a policy told "turn left" only
             once it is already in the junction has no time to act.
         search_window: Waypoints ahead of the current index considered when
             re-projecting. Must exceed the distance covered in one tick.

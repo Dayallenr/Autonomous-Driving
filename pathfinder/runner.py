@@ -25,7 +25,7 @@ from pathfinder.sim.base import EpisodeSpec, FrameState, Infraction, SimulatorBa
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["ControlOutput", "Planner", "PurePursuitPlanner", "run_episode"]
+__all__ = ["ControlOutput", "Policy", "PurePursuitPolicy", "run_episode"]
 
 
 @dataclass(frozen=True)
@@ -35,25 +35,25 @@ class ControlOutput:
     throttle: float
     steer: float
     brake: float
-    #: How long the planner took, carried into telemetry so planner latency is
+    #: How long the policy took, carried into telemetry so policy latency is
     #: measured rather than estimated.
     latency_ms: float = 0.0
 
 
-class Planner(Protocol):
-    """What the runner needs from a planner. Deliberately structural: the CIL
+class Policy(Protocol):
+    """What the runner needs from a policy. Deliberately structural: the CIL
     model, a classical controller, and a test stub all satisfy it without
     inheriting anything."""
 
     def plan(self, state: FrameState) -> ControlOutput: ...
 
 
-class PurePursuitPlanner:
+class PurePursuitPolicy:
     """Geometric baseline: Stanley-style lateral control + speed governor.
 
     Exists so the whole pipeline is runnable and scoreable without trained
-    weights, and so the CIL planner has something to be measured against. A
-    learned planner that cannot beat a geometric controller has not demonstrated
+    weights, and so the CIL policy has something to be measured against. A
+    learned policy that cannot beat a geometric controller has not demonstrated
     anything, and without a baseline in the repo that comparison never gets made.
 
     Lateral control combines three terms, which is what Stanley control is:
@@ -128,7 +128,7 @@ class PurePursuitPlanner:
 def run_episode(
     simulator: SimulatorBackend,
     spec: EpisodeSpec,
-    planner: Planner,
+    policy: Policy,
     *,
     telemetry_sink: Callable[[dict], None] | None = None,
     worker_id: str = "local",
@@ -140,17 +140,14 @@ def run_episode(
     Args:
         simulator: Backend to drive in.
         spec: The episode to run.
-        planner: Anything satisfying :class:`Planner`.
+        policy: Anything satisfying :class:`Policy`.
         telemetry_sink: Called once per frame with a warehouse-shaped row.
             Exceptions from it are swallowed — telemetry must never abort a run.
         worker_id: Recorded in telemetry for attribution.
-        model_version: Planner identifier. Accepted for attribution but **not
-            yet written anywhere**: the frame schema in ``cloud/warehouse.py``
-            has no such column, and nothing writes the episode table that does.
-            Callers pass it so the value exists at the point that knows it; the
-            gRPC ``EpisodeResult`` is currently the only place it reaches.
-        dataset_version: Data the planner trained on. Same standing as
-            ``model_version``.
+        model_version: Which policy drove, recorded on every telemetry frame
+            so a result can never be read as evidence about a policy that did
+            not produce it.
+        dataset_version: Data that policy trained on, recorded alongside it.
 
     Returns:
         The scored episode. A simulator failure produces a ``status="failed"``
@@ -167,7 +164,7 @@ def run_episode(
 
     try:
         while frames < spec.max_steps:
-            control = planner.plan(state)
+            control = policy.plan(state)
 
             perception_started = time.perf_counter()
             result = simulator.step(control.throttle, control.steer, control.brake)
@@ -201,11 +198,13 @@ def run_episode(
                                 if result.state.nearest_object_m != float("inf")
                                 else -1.0
                             ),
-                            "planner_latency_ms": control.latency_ms,
+                            "policy_latency_ms": control.latency_ms,
                             "perception_latency_ms": step_ms,
                             "infraction": result.infractions[0].value
                             if result.infractions
                             else "",
+                            "model_version": model_version,
+                            "dataset_version": dataset_version,
                             "event_date": event_date,
                         }
                     )

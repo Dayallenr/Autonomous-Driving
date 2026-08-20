@@ -37,10 +37,10 @@ import grpc
 from pathfinder.cloud.queue import MessageQueue, build_queue, ensure_queue
 from pathfinder.cloud.stream import TelemetryStream, build_stream
 from pathfinder.metrics.driving_score import EpisodeScore
-from pathfinder.planners import (
-    DEFAULT_PLANNER,
-    PLANNER_NAMES,
-    build_planner,
+from pathfinder.policies import (
+    DEFAULT_POLICY,
+    POLICY_NAMES,
+    build_policy,
     result_label,
 )
 from pathfinder.rpc.client import CoordinatorClient, WorkerHeartbeatState, episode_score_to_proto
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 async def _drain_one(
     queue: MessageQueue,
     simulator,
-    planner,
+    policy,
     *,
     worker_id: str,
     state: WorkerHeartbeatState,
@@ -88,7 +88,7 @@ async def _drain_one(
 
     try:
         score = await asyncio.to_thread(
-            run_episode, simulator, spec, planner,
+            run_episode, simulator, spec, policy,
             worker_id=worker_id, model_version=model_version, telemetry_sink=telemetry_sink,
         )
         # Delete only after a result exists, so a crash mid-episode leaves the
@@ -105,7 +105,7 @@ async def run_worker(
     coordinator_address: str,
     queue: MessageQueue,
     simulator_backend: str = "kinematic",
-    planner_name: str = DEFAULT_PLANNER,
+    policy_name: str = DEFAULT_POLICY,
     model_version: str | None = None,
     idle_timeout_seconds: float = 5.0,
     receive_wait_seconds: float = 2.0,
@@ -133,7 +133,7 @@ async def run_worker(
     client.start_heartbeat(worker_id, registration.heartbeat_interval_seconds, state)
 
     simulator = build_simulator(simulator_backend)
-    label = result_label(planner_name, model_version)
+    label = result_label(policy_name, model_version)
     idle_since: float | None = None
 
     try:
@@ -142,10 +142,10 @@ async def run_worker(
         # agent asked to drive the kinematic backend, say — raises here, before
         # a single message is taken off the queue, rather than turning every
         # Episode into a scored failure. Inside the try so teardown still runs.
-        planner = build_planner(planner_name, simulator=simulator)
+        policy = build_policy(policy_name, simulator=simulator)
         while not client.should_stop and (stop_event is None or not stop_event.is_set()):
             score = await _drain_one(
-                queue, simulator, planner,
+                queue, simulator, policy,
                 worker_id=worker_id, state=state, wait_seconds=receive_wait_seconds,
                 model_version=label, telemetry_stream=telemetry_stream,
             )
@@ -226,14 +226,14 @@ def main() -> None:
     parser.add_argument("--queue-region", type=str, default="us-east-1")
     parser.add_argument("--simulator-backend", choices=["kinematic", "carla", "auto"], default="kinematic")
     parser.add_argument(
-        "--planner", choices=list(PLANNER_NAMES), default=DEFAULT_PLANNER,
+        "--policy", choices=list(POLICY_NAMES), default=DEFAULT_POLICY,
         help="Which Policy to score. 'carla_builtin_behavior_agent' is CARLA's own "
         "behaviour agent, kept as a reference baseline rather than as project work; "
         "it needs --simulator-backend carla.",
     )
     parser.add_argument(
         "--model-version", type=str, default=None,
-        help="Label recorded against every result. Defaults to --planner; set it "
+        help="Label recorded against every result. Defaults to --policy; set it "
         "explicitly when the Policy has trained weights whose version its name "
         "does not carry.",
     )
@@ -302,7 +302,7 @@ async def _run_with_signal_handling(
         coordinator_address=args.coordinator,
         queue=queue,
         simulator_backend=args.simulator_backend,
-        planner_name=args.planner,
+        policy_name=args.policy,
         model_version=args.model_version,
         idle_timeout_seconds=args.idle_timeout_seconds,
         stop_event=stop_event,

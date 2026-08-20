@@ -7,7 +7,7 @@ CARLA ships two separate things. The pip wheel (``pip install carla``) provides
 the ``carla`` module — client, world, actors, sensors. It does **not** provide
 ``agents``, which holds ``GlobalRoutePlanner`` and ``RoadOption``: the route
 planning this project needs to produce real navigation commands for the
-four-branch conditional planner.
+four-branch conditional policy.
 
 ``agents`` lives only inside the downloaded CARLA release, under
 ``PythonAPI/carla/``. The usual advice is to set ``PYTHONPATH`` by hand, which

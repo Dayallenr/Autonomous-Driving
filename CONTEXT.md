@@ -14,6 +14,9 @@ _Avoid_: the model, the network, perception model
 
 **Policy**:
 The model that maps an observation to a steering, throttle, and brake command.
+In code this is the `Policy` protocol in `pathfinder/runner.py`; implementations
+are registered in `pathfinder/policies.py` and selected by name. It used to be
+called `Planner` — see `docs/adr/0002-the-policy-interface-is-named-policy.md`.
 _Avoid_: the model, the planner, the agent, the driver
 
 Both are models, so **"the model" is never a valid term on its own** — say which

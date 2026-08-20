@@ -1,5 +1,5 @@
 """
-Telemetry stream: sensor and planner state out of the driving loop.
+Telemetry stream: sensor and policy state out of the driving loop.
 
 Kinesis-shaped, because telemetry is a *stream* problem rather than a queue
 problem, and the difference matters:
