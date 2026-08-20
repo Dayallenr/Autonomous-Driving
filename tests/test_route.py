@@ -59,6 +59,28 @@ def test_lateral_error_is_positive_to_the_left():
     assert tracker.update(10.0, -2.5, 0.0)["lateral_error_m"] == pytest.approx(-2.5)
 
 
+def test_lateral_error_uses_the_lane_heading_fallback_on_a_degenerate_segment():
+    """CARLA's GlobalRoutePlanner emits duplicate waypoints at junctions, so the
+    tracker's index can land on a zero-length segment. When that happens the
+    lateral error must fall back to the point's own lane heading rather than
+    silently reporting ~0 regardless of how far the ego actually is — a real
+    bug that let a car drift 100+ m off route with no deviation ever flagged
+    (issue #5's live validation run)."""
+    points = [
+        RoutePoint(x=0.0, y=0.0, yaw_rad=0.0),
+        RoutePoint(x=10.0, y=0.0, yaw_rad=math.pi / 2),
+        RoutePoint(x=10.0, y=0.0, yaw_rad=math.pi / 2),  # duplicate: degenerate segment
+        RoutePoint(x=10.0, y=10.0, yaw_rad=math.pi / 2),
+    ]
+    tracker = RouteTracker(points)
+    # Locks the tracker's index onto the degenerate point, then offsets 3 m to
+    # its right along the fallback heading (+y) rather than along the (zero)
+    # raw segment vector.
+    tracker.update(10.0, 0.0, 0.0)
+    error = tracker.update(13.0, 0.0, 0.0)["lateral_error_m"]
+    assert error == pytest.approx(-3.0)
+
+
 def test_deviation_is_flagged_past_the_threshold():
     tracker = RouteTracker(straight_route())
     assert not tracker.update(10.0, ROUTE_DEVIATION_M - 1.0, 0.0)["deviated"]
@@ -171,6 +193,50 @@ def test_command_comes_from_the_lookahead_not_the_current_point():
 def test_a_straight_route_has_no_curvature():
     tracker = RouteTracker(straight_route())
     assert tracker.update(10.0, 0.0, 0.0)["lookahead_curvature"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_duplicate_waypoints_do_not_fabricate_curvature():
+    """A coincident neighbour must not be read as a heading of zero.
+
+    CARLA's GlobalRoutePlanner emits duplicate waypoints at junctions. With
+    ``atan2(0, 0) == 0.0`` standing in for the incoming heading, curvature
+    became the *absolute* heading of the outgoing leg — reaching -pi on a
+    westward route. At the default curvature gain of 8 that saturates steering
+    to full lock and pins the speed governor at its floor, which stalled issue
+    #5's validation run at 8% route completion.
+    """
+    # Straight, heading west (yaw = pi), with a duplicate at index 2.
+    points = [
+        RoutePoint(x=-2.0 * i, y=0.0, yaw_rad=math.pi) for i in range(3)
+    ]
+    points.insert(2, RoutePoint(x=points[1].x, y=points[1].y, yaw_rad=math.pi))
+    points += [RoutePoint(x=-2.0 * i, y=0.0, yaw_rad=math.pi) for i in range(3, 8)]
+
+    tracker = RouteTracker(points)
+    for index in range(1, len(points) - 1):
+        curvature = tracker._curvature_at(index)
+        assert abs(curvature) < 1e-6, (
+            f"straight route reported curvature {curvature} at index {index}"
+        )
+
+
+def test_curvature_survives_a_duplicate_on_a_real_bend():
+    """The duplicate must be stepped over, not merely zeroed — otherwise
+    curvature vanishes exactly at the junctions where it matters most."""
+    radius = 30.0
+    points = [
+        RoutePoint(radius * math.sin(i / 50), radius * (1 - math.cos(i / 50)), 0.0)
+        for i in range(100)
+    ]
+    clean = RouteTracker(points)._curvature_at(10)
+
+    with_duplicate = list(points)
+    with_duplicate.insert(10, RoutePoint(points[9].x, points[9].y, 0.0))
+    # Index 11 is the same geometric point as index 10 in the clean route.
+    duplicated = RouteTracker(with_duplicate)._curvature_at(11)
+
+    assert duplicated == pytest.approx(clean, rel=0.05)
+    assert duplicated == pytest.approx(1 / radius, rel=0.3)
 
 
 def test_curvature_is_signed_by_turn_direction():

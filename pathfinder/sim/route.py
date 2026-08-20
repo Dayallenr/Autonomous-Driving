@@ -42,6 +42,15 @@ __all__ = [
 #: it, because a car 30 m off course is not driving the route being scored.
 ROUTE_DEVIATION_M = 30.0
 
+#: Separation below which two route points are treated as coincident. CARLA's
+#: route planner emits exact duplicates at junctions, so this only has to
+#: distinguish "the same point" from "a real segment".
+_COINCIDENT_M = 1e-6
+
+#: How far :meth:`RouteTracker._distinct_neighbour` will search past coincident
+#: points before giving up, keeping curvature O(1) rather than O(route).
+_DUPLICATE_SEARCH_LIMIT = 10
+
 #: CARLA ``RoadOption`` names mapped onto the policy's four branches. Held as
 #: strings so this module never imports CARLA.
 _ROAD_OPTION_TO_COMMAND = {
@@ -184,8 +193,11 @@ class RouteTracker:
             segment_x, segment_y = math.cos(first.yaw_rad), math.sin(first.yaw_rad)
             length = 1.0
 
-        # 2-D cross product of the segment direction with the ego offset.
-        return ((second.x - first.x) * (y - first.y) - (second.y - first.y) * (x - first.x)) / length
+        # 2-D cross product of the segment direction with the ego offset. Must
+        # use segment_x/segment_y (not recompute second - first) so the
+        # degenerate-segment fallback above actually takes effect instead of
+        # being silently discarded in favour of a ~0 raw delta.
+        return (segment_x * (y - first.y) - segment_y * (x - first.x)) / length
 
     def _index_ahead(self, distance_m: float) -> int:
         target = self._cumulative[self.index] + distance_m
@@ -204,12 +216,26 @@ class RouteTracker:
         reports exactly half the true curvature, which is the kind of error that
         never crashes anything and quietly halves every steering command that
         depends on it.
+
+        Neighbours must be *distinct* points. CARLA's ``GlobalRoutePlanner``
+        emits duplicate waypoints at junctions, and a coincident neighbour makes
+        ``atan2(0, 0)`` return 0.0 — not a heading but the absence of one. The
+        mean-length ``arc`` still comes out finite from the surviving leg, so the
+        old guard never fired and this returned ``heading_out`` itself: an
+        absolute heading reported as a curvature, reaching ±pi on a westward
+        route. At a curvature gain of 8 that saturates steering to full lock and
+        clamps the speed governor to its floor, which is exactly how a route
+        stalls at 8% completion (issue #5's live validation run).
         """
         if index <= 0 or index >= len(self.points) - 1:
             return 0.0
-        previous, current, following = (
-            self.points[index - 1], self.points[index], self.points[index + 1]
-        )
+        current = self.points[index]
+
+        previous = self._distinct_neighbour(index, step=-1)
+        following = self._distinct_neighbour(index, step=1)
+        if previous is None or following is None:
+            return 0.0
+
         heading_in = math.atan2(current.y - previous.y, current.x - previous.x)
         heading_out = math.atan2(following.y - current.y, following.x - current.x)
 
@@ -219,6 +245,25 @@ class RouteTracker:
         if arc < 1e-6:
             return 0.0
         return _wrap_angle(heading_out - heading_in) / arc
+
+    def _distinct_neighbour(self, index: int, *, step: int) -> RoutePoint | None:
+        """Nearest point in direction ``step`` that is not coincident with
+        ``points[index]``, or None if there is none within the search bound.
+
+        Bounded so a run of duplicates cannot make curvature O(route); a route
+        with more than :data:`_DUPLICATE_SEARCH_LIMIT` coincident points in a row
+        has no local geometry to measure and degrades to zero curvature.
+        """
+        current = self.points[index]
+        limit = min(_DUPLICATE_SEARCH_LIMIT, len(self.points))
+        for offset in range(1, limit + 1):
+            candidate_index = index + step * offset
+            if not 0 <= candidate_index < len(self.points):
+                return None
+            candidate = self.points[candidate_index]
+            if math.hypot(candidate.x - current.x, candidate.y - current.y) > _COINCIDENT_M:
+                return candidate
+        return None
 
 
 def _wrap_angle(angle: float) -> float:
