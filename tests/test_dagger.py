@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from pathfinder.dagger import DAggerConfig, run_dagger
+from pathfinder.dagger import DAggerConfig, IterationReport, run_dagger
 from pathfinder.runner import ControlOutput, PurePursuitPolicy
 from pathfinder.sim.base import EpisodeSpec, FrameState, SimulatorBackend, StepResult
 from pathfinder.sim.kinematic import KinematicSimulator
@@ -192,6 +192,131 @@ def test_injected_simulator_is_not_closed():
     # The caller opened the backend, so the caller owns its lifetime — a CARLA
     # connection must survive the training run that borrowed it.
     assert simulator.close_calls == 0
+
+
+def report_row_key(item):
+    """One iteration's numbers, minus wall-clock, for cross-run comparison."""
+    return (
+        item.iteration,
+        item.beta,
+        item.dataset_size,
+        item.train_loss,
+        "nan" if np.isnan(item.disagreement) else item.disagreement,
+        item.driving_score,
+        item.route_completion,
+    )
+
+
+def test_on_iteration_sees_each_iterations_new_samples_and_trained_row():
+    from pathfinder.dagger import IterationSamples
+
+    seen: list[tuple[int, int]] = []
+
+    def on_iteration(row, samples, model, optimizer):
+        # The callback fires after training, so the row is final and the model
+        # already reflects it — that is what a checkpoint must capture.
+        assert isinstance(samples, IterationSamples)
+        assert len(samples.images) == len(samples.commands) == len(samples.actions)
+        assert optimizer.state_dict() is not None
+        seen.append((row.iteration, len(samples.images)))
+
+    config = tiny_config()
+    simulator = ScriptedSimulator(steps_per_episode=config.max_steps)
+    _, report = run_dagger(
+        config, model=TinyBranchModel(), simulator=simulator,
+        expert=RecordingExpert(), progress=False, on_iteration=on_iteration,
+    )
+
+    # One call per iteration, and the per-iteration sample counts sum to the
+    # final aggregate dataset size — nothing collected escapes the callback.
+    assert [iteration for iteration, _ in seen] == [0, 1]
+    assert sum(count for _, count in seen) == report.iterations[-1].dataset_size
+
+
+def test_resume_reproduces_an_uninterrupted_run_exactly():
+    """Killing a run after iteration k and resuming from its checkpoint must
+    reproduce the uninterrupted run's remaining iterations bit-identically —
+    the property that makes 'a crash costs one iteration' true rather than
+    'a crash costs one iteration and changes the numbers'."""
+    import copy
+
+    from pathfinder.dagger import DAggerResume, IterationSamples
+
+    def uninterrupted():
+        torch.manual_seed(0)
+        with KinematicSimulator(render=True) as simulator:
+            _, report = run_dagger(
+                tiny_config(iterations=3, max_steps=10, route_length_m=30.0, beta_decay=0.5),
+                model=TinyBranchModel(),
+                simulator=simulator,
+                progress=False,
+            )
+        return [report_row_key(item) for item in report.iterations]
+
+    def killed_then_resumed():
+        torch.manual_seed(0)
+        checkpoints = []
+
+        def on_iteration(row, samples, model, optimizer):
+            checkpoints.append(
+                (row, samples, copy.deepcopy(optimizer.state_dict()))
+            )
+
+        # First sitting: two iterations, then the "crash".
+        with KinematicSimulator(render=True) as simulator:
+            model, _ = run_dagger(
+                tiny_config(iterations=2, max_steps=10, route_length_m=30.0, beta_decay=0.5),
+                model=TinyBranchModel(),
+                simulator=simulator,
+                progress=False,
+                on_iteration=on_iteration,
+            )
+
+        rows = [row for row, _, _ in checkpoints]
+        samples = IterationSamples(images=[], commands=[], actions=[])
+        for _, batch, _ in checkpoints:
+            samples.images.extend(batch.images)
+            samples.commands.extend(batch.commands)
+            samples.actions.extend(batch.actions)
+        resume = DAggerResume(
+            rows=rows, samples=samples, optimizer_state=checkpoints[-1][2]
+        )
+
+        # Second sitting: same target config, fresh simulator, resumed state.
+        with KinematicSimulator(render=True) as simulator:
+            _, report = run_dagger(
+                tiny_config(iterations=3, max_steps=10, route_length_m=30.0, beta_decay=0.5),
+                model=model,
+                simulator=simulator,
+                progress=False,
+                resume_from=resume,
+            )
+        return [report_row_key(item) for item in report.iterations]
+
+    assert killed_then_resumed() == uninterrupted()
+
+
+def test_resume_rejects_already_complete_state():
+    import pytest
+
+    from pathfinder.dagger import DAggerResume, IterationSamples
+
+    rows = [
+        IterationReport(
+            iteration=index, beta=1.0, dataset_size=1, train_loss=0.0,
+            disagreement=0.0, driving_score=0.0, route_completion=0.0, seconds=0.0,
+        )
+        for index in range(2)
+    ]
+    resume = DAggerResume(
+        rows=rows,
+        samples=IterationSamples(images=[], commands=[], actions=[]),
+        optimizer_state=None,
+    )
+    with pytest.raises(ValueError, match="already"):
+        run_dagger(tiny_config(iterations=2), model=TinyBranchModel(),
+                   simulator=ScriptedSimulator(), expert=RecordingExpert(),
+                   progress=False, resume_from=resume)
 
 
 def test_defaults_reproduce_kinematic_pure_pursuit_exactly():
