@@ -10,6 +10,13 @@
 # ModuleNotFoundError on the first routed episode.
 networkx>=3.0
 
+# Required by CARLA's own agents/navigation/basic_agent.py, which
+# CarlaBehaviorAgentPolicy (pathfinder/policies.py) instantiates via
+# BehaviorAgent. Same situation as networkx above: ships with the CARLA
+# release, not declared by the wheel, ModuleNotFoundError on the first
+# episode that runs the reference baseline (#16).
+shapely>=2.0
+
 # Deep learning
 torch>=2.0.0
 torchvision>=0.15.0
