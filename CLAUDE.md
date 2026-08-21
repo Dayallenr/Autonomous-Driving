@@ -288,7 +288,9 @@ pathfinder/
               carla_paths.py (locates CARLA's agents pkg) · render.py (200x88)
   cloud/      queue.py (SQS + local, real visibility-timeout/DLQ semantics)
               stream.py · objects.py (S3 + dataset registry) · warehouse.py
-              training.py (SageMaker contract)
+              training.py (SageMaker contract) · cli.py (#35: the one home
+              for the queue/telemetry/object-store flag groups + builders
+              that all four cloud CLIs mount)
   data/       kitti.py — provenance, sequence-disjoint split, rebalancing
   detection/  evaluate.py — per-class reports with instance/image/drive support
   metrics/    detection.py (mAP) · driving_score.py (CARLA Leaderboard)

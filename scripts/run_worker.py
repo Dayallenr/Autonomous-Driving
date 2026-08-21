@@ -34,8 +34,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import grpc
 
-from pathfinder.cloud.queue import MessageQueue, build_queue, ensure_queue
-from pathfinder.cloud.stream import TelemetryStream, build_stream
+from pathfinder.cloud import cli as cloud_cli
+from pathfinder.cloud.queue import MessageQueue
+from pathfinder.cloud.stream import TelemetryStream
 from pathfinder.metrics.driving_score import EpisodeScore
 from pathfinder.policies import (
     DEFAULT_POLICY,
@@ -224,19 +225,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="PathFinder distributed benchmark worker")
     parser.add_argument("--worker-id", type=str, default=f"worker-{uuid.uuid4().hex[:8]}")
     parser.add_argument("--coordinator", type=str, required=True, help="host:port")
-    parser.add_argument("--queue-backend", choices=["local", "sqs"], default="local")
-    parser.add_argument(
-        "--queue-url", type=str, default="",
-        help="Explicit SQS queue URL. Alternative to --queue-name for a known/pre-provisioned queue.",
-    )
-    parser.add_argument(
-        "--queue-name", type=str, default="",
-        help="SQS queue name to create-or-resolve via --queue-endpoint-url (LocalStack convenience; "
-        "real deployments should pass --queue-url to a Terraform-provisioned queue instead).",
-    )
-    parser.add_argument("--dead-letter-queue-url", type=str, default=None)
-    parser.add_argument("--queue-endpoint-url", type=str, default=None, help="For LocalStack")
-    parser.add_argument("--queue-region", type=str, default="us-east-1")
+    cloud_cli.add_queue_args(parser, backend_default="local", queue_name_default="")
     parser.add_argument("--simulator-backend", choices=["kinematic", "carla", "auto"], default="kinematic")
     parser.add_argument(
         "--policy", choices=list(POLICY_NAMES), default=DEFAULT_POLICY,
@@ -251,15 +240,11 @@ def main() -> None:
         "does not carry.",
     )
     parser.add_argument("--idle-timeout-seconds", type=float, default=5.0)
-    parser.add_argument(
-        "--telemetry-backend", choices=["none", "local", "kinesis"], default="none",
-        help="Stream per-frame telemetry as episodes run. 'none' skips it entirely "
+    cloud_cli.add_telemetry_args(
+        parser,
+        backend_help="Stream per-frame telemetry as episodes run. 'none' skips it entirely "
         "(cheapest — no telemetry work at all).",
     )
-    parser.add_argument("--telemetry-stream-name", type=str, default="pathfinder-telemetry")
-    parser.add_argument("--telemetry-local-root", type=str, default="./telemetry")
-    parser.add_argument("--telemetry-endpoint-url", type=str, default=None, help="For LocalStack")
-    parser.add_argument("--telemetry-region", type=str, default="us-east-1")
     parser.add_argument("--log-level", type=str, default="INFO")
     args = parser.parse_args()
 
@@ -268,32 +253,8 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    queue_url = args.queue_url
-    if args.queue_backend == "sqs" and not queue_url:
-        if not args.queue_name:
-            raise SystemExit("--queue-backend sqs requires --queue-url or --queue-name")
-        queue_url = ensure_queue(
-            args.queue_name, endpoint_url=args.queue_endpoint_url, region=args.queue_region
-        )
-        logger.info("resolved queue %r to %s", args.queue_name, queue_url)
-
-    queue = build_queue(
-        args.queue_backend,
-        queue_url=queue_url,
-        dead_letter_queue_url=args.dead_letter_queue_url,
-        endpoint_url=args.queue_endpoint_url,
-        region=args.queue_region,
-    )
-
-    telemetry_stream = None
-    if args.telemetry_backend != "none":
-        telemetry_stream = build_stream(
-            args.telemetry_backend,
-            local_root=args.telemetry_local_root,
-            stream_name=args.telemetry_stream_name,
-            endpoint_url=args.telemetry_endpoint_url,
-            region=args.telemetry_region,
-        )
+    queue = cloud_cli.queue_from_args(args)
+    telemetry_stream = cloud_cli.stream_from_args(args)
 
     results = asyncio.run(_run_with_signal_handling(args, queue, telemetry_stream))
     logger.info("worker %s completed %d episodes", args.worker_id, len(results))

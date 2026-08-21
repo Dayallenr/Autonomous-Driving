@@ -284,6 +284,12 @@ async def collect_report(
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Imported here rather than at module top for the same reason as in the
+    # sibling CLIs: the library-level builder has no business importing the
+    # queue, stream, and store backends its arguments duck-type — and
+    # pathfinder.cloud.cli imports all of them.
+    from pathfinder.cloud import cli as cloud_cli
+
     parser = argparse.ArgumentParser(
         description=(
             "Collect a distributed benchmark run into one report artifact: "
@@ -311,42 +317,21 @@ def main(argv: list[str] | None = None) -> int:
         "--suite is given",
     )
 
-    parser.add_argument("--queue-backend", choices=["local", "sqs"], default="sqs")
-    parser.add_argument("--queue-url", type=str, default="")
-    parser.add_argument("--queue-name", type=str, default="pathfinder-episodes")
-    parser.add_argument("--dead-letter-queue-url", type=str, default=None)
-    parser.add_argument("--queue-endpoint-url", type=str, default=None, help="For LocalStack")
-    parser.add_argument("--queue-region", type=str, default="us-east-1")
+    cloud_cli.add_queue_args(parser)
 
-    parser.add_argument(
-        "--telemetry-backend", choices=["none", "local", "kinesis"], default="none",
-        help="Drain this stream into Parquet before reporting; 'none' records "
+    cloud_cli.add_telemetry_args(
+        parser,
+        backend_help="Drain this stream into Parquet before reporting; 'none' records "
         "the report with telemetry marked not archived.",
     )
-    parser.add_argument("--telemetry-stream-name", type=str, default="pathfinder-telemetry")
-    parser.add_argument("--telemetry-local-root", type=str, default="./telemetry")
-    parser.add_argument("--telemetry-endpoint-url", type=str, default=None, help="For LocalStack")
-    parser.add_argument("--telemetry-region", type=str, default="us-east-1")
 
-    parser.add_argument("--object-backend", choices=["local", "s3"], default="local")
-    parser.add_argument("--bucket", type=str, default="pathfinder")
-    parser.add_argument("--object-local-root", type=str, default="./s3")
-    parser.add_argument("--object-endpoint-url", type=str, default=None, help="For LocalStack")
-    parser.add_argument("--object-region", type=str, default="us-east-1")
-    parser.add_argument("--warehouse-prefix", type=str, default="telemetry")
+    cloud_cli.add_object_store_args(parser, backend_default="local")
 
     parser.add_argument(
         "--output", type=Path, default=Path("results/distributed/report.json")
     )
     args = parser.parse_args(argv)
 
-    # Imported here rather than at module top for the same reason as in the
-    # sibling CLIs: the library-level builder has no business importing the
-    # queue, stream, and store backends its arguments duck-type.
-    from pathfinder.cloud.objects import build_store
-    from pathfinder.cloud.queue import build_queue, ensure_queue
-    from pathfinder.cloud.stream import build_stream
-    from pathfinder.cloud.warehouse import TelemetryWarehouse
     from pathfinder.orchestration import build_episode_specs
 
     if args.suite is not None:
@@ -365,36 +350,12 @@ def main(argv: list[str] | None = None) -> int:
             "only as right as those flags"
         )
 
-    queue_url = args.queue_url
-    if args.queue_backend == "sqs" and not queue_url:
-        queue_url = ensure_queue(
-            args.queue_name, endpoint_url=args.queue_endpoint_url, region=args.queue_region
-        )
-    queue = build_queue(
-        args.queue_backend,
-        queue_url=queue_url,
-        dead_letter_queue_url=args.dead_letter_queue_url,
-        endpoint_url=args.queue_endpoint_url,
-        region=args.queue_region,
-    )
+    queue = cloud_cli.queue_from_args(args)
 
     telemetry = None
-    if args.telemetry_backend != "none":
-        stream = build_stream(
-            args.telemetry_backend,
-            local_root=args.telemetry_local_root,
-            stream_name=args.telemetry_stream_name,
-            endpoint_url=args.telemetry_endpoint_url,
-            region=args.telemetry_region,
-        )
-        store = build_store(
-            args.object_backend,
-            local_root=args.object_local_root,
-            bucket=args.bucket,
-            endpoint_url=args.object_endpoint_url,
-            region=args.object_region,
-        )
-        telemetry = archive_telemetry(stream, TelemetryWarehouse(store, prefix=args.warehouse_prefix))
+    stream = cloud_cli.stream_from_args(args)
+    if stream is not None:
+        telemetry = archive_telemetry(stream, cloud_cli.warehouse_from_args(args))
 
     report = asyncio.run(
         collect_report(

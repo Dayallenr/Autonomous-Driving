@@ -13,23 +13,20 @@ Usage (LocalStack, the docker-compose default):
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from pathfinder.cloud.queue import build_queue, ensure_queue
+from pathfinder.cloud import cli as cloud_cli
 from pathfinder.orchestration import build_episode_specs
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed episode specs onto a work queue")
     parser.add_argument("--count", type=int, default=8)
-    parser.add_argument("--queue-backend", choices=["local", "sqs"], default="sqs")
-    parser.add_argument("--queue-url", type=str, default="")
-    parser.add_argument("--queue-name", type=str, default="pathfinder-episodes")
-    parser.add_argument("--queue-endpoint-url", type=str, default=None, help="For LocalStack")
-    parser.add_argument("--queue-region", type=str, default="us-east-1")
+    cloud_cli.add_queue_args(parser)
     parser.add_argument("--route-length-m", type=float, default=400.0)
     parser.add_argument(
         "--suite-out", type=Path, default=None,
@@ -40,25 +37,22 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    queue_url = args.queue_url
-    if args.queue_backend == "sqs" and not queue_url:
-        queue_url = ensure_queue(
-            args.queue_name, endpoint_url=args.queue_endpoint_url, region=args.queue_region
-        )
-        print(f"resolved queue {args.queue_name!r} to {queue_url}")
+    # Bare messages on stdout, so queue_from_args's "resolved queue ... to
+    # ..." line keeps printing exactly as this script always has — a line
+    # the #22 runbook's transcript reads. INFO is opened only for that
+    # module's logger; at root level it would let botocore chatter through.
+    logging.basicConfig(format="%(message)s", stream=sys.stdout)
+    logging.getLogger("pathfinder.cloud.cli").setLevel(logging.INFO)
 
-    queue = build_queue(
-        args.queue_backend,
-        queue_url=queue_url,
-        endpoint_url=args.queue_endpoint_url,
-        region=args.queue_region,
-    )
+    queue = cloud_cli.queue_from_args(args)
 
     specs = build_episode_specs(count=args.count, route_length_m=args.route_length_m)
     for spec in specs:
         queue.send(spec.to_dict())
 
-    print(f"enqueued {len(specs)} episodes onto {queue_url or '(local, in-process)'}")
+    # Only the SQS backend has a URL; the local queue lives in this process.
+    destination = getattr(queue, "queue_url", "") or "(local, in-process)"
+    print(f"enqueued {len(specs)} episodes onto {destination}")
 
     if args.suite_out is not None:
         import json

@@ -22,50 +22,27 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from pathfinder.cloud.objects import build_store
-from pathfinder.cloud.stream import build_stream
-from pathfinder.cloud.warehouse import TelemetryWarehouse
+from pathfinder.cloud import cli as cloud_cli
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Archive telemetry stream records to Parquet")
-    parser.add_argument("--telemetry-backend", choices=["local", "kinesis"], default="kinesis")
-    parser.add_argument("--telemetry-stream-name", type=str, default="pathfinder-telemetry")
-    parser.add_argument("--telemetry-local-root", type=str, default="./telemetry")
-    parser.add_argument("--telemetry-endpoint-url", type=str, default=None, help="For LocalStack")
-    parser.add_argument("--telemetry-region", type=str, default="us-east-1")
-
-    parser.add_argument("--object-backend", choices=["local", "s3"], default="s3")
-    parser.add_argument("--bucket", type=str, default="pathfinder")
-    parser.add_argument("--object-local-root", type=str, default="./s3")
-    parser.add_argument("--object-endpoint-url", type=str, default=None, help="For LocalStack")
-    parser.add_argument("--object-region", type=str, default="us-east-1")
-    parser.add_argument("--warehouse-prefix", type=str, default="telemetry")
+    # optional=False: draining the stream is this script's whole job, so a
+    # 'none' telemetry backend would be meaningless here.
+    cloud_cli.add_telemetry_args(parser, backend_default="kinesis", optional=False)
+    cloud_cli.add_object_store_args(parser, backend_default="s3")
 
     parser.add_argument("--limit", type=int, default=100_000, help="Max records to drain")
     args = parser.parse_args()
 
-    stream = build_stream(
-        args.telemetry_backend,
-        local_root=args.telemetry_local_root,
-        stream_name=args.telemetry_stream_name,
-        endpoint_url=args.telemetry_endpoint_url,
-        region=args.telemetry_region,
-    )
-    store = build_store(
-        args.object_backend,
-        local_root=args.object_local_root,
-        bucket=args.bucket,
-        endpoint_url=args.object_endpoint_url,
-        region=args.object_region,
-    )
-    warehouse = TelemetryWarehouse(store, prefix=args.warehouse_prefix)
+    stream = cloud_cli.stream_from_args(args)
+    warehouse = cloud_cli.warehouse_from_args(args)
 
     keys = warehouse.drain_stream(stream, limit=args.limit)
 
     print(f"wrote {warehouse.rows_written} row(s) across {len(keys)} Parquet file(s):")
     for key in keys:
-        print(f"  {store.uri_for(key)}")
+        print(f"  {warehouse.store.uri_for(key)}")
 
 
 if __name__ == "__main__":
