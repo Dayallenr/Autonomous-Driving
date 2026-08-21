@@ -222,10 +222,10 @@ that a driven episode only ever surfaces commands its own route planned.
 | 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
 | 7 Terraform / LocalStack / kind | **Written, never applied** — `terraform/` passes `fmt -check`, `init -backend=false`, `validate`, and `checkov` in CI; provisions EKS, ECR, SQS+DLQ, S3, **Kinesis**, KMS, IRSA, GitHub OIDC. `k8s/` carries kind manifests and an `eks/` overlay. Nothing has been applied to real AWS |
 | 8 CI/CD | **Done** — `.github/workflows/ci.yml` (ruff, pytest, hadolint, Docker build, trivy, compose validate, terraform validate + checkov) and `deploy.yml` (manual `workflow_dispatch` only) |
-| 9 README + demo | Not started; current README describes the old project |
-| 10 Claim-to-artifact mapping | **In progress** — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table landed (#24, 2026-08-21): root `CLAIMS.md` is the claim-of-record — every established finding cited machine-checked, the boundary claims prose-audited, all passing in CI (`python -m pathfinder.claims` for the live counts). The README opt-in (#23) is next |
+| 9 README + demo | **README done** (#23, 2026-08-21) — findings-first rewrite, opted in to the claim checker (55 machine-checked + 16 prose-audited claims verified in CI), tool-honesty boundaries in the established phrasing, zero-GPU quickstart executed end-to-end on the Mac in a fresh Python 3.12 venv. The demo clip slot remains open (#27) and the README does not wait on it |
+| 10 Claim-to-artifact mapping | **In progress** — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table landed (#24, 2026-08-21): root `CLAIMS.md` is the claim-of-record — every established finding cited machine-checked, the boundary claims prose-audited, all passing in CI (`python -m pathfinder.claims` for the live counts). The README opted in with #23 (2026-08-21) |
 
-413 tests pass on the Mac; `ruff check` clean.
+414 tests pass on the Mac; `ruff check` clean.
 
 ---
 

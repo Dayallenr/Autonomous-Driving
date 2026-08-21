@@ -1,6 +1,6 @@
 # Perception ablation — kinematic backend
 
-Generated 2026-08-20T08:12:06+00:00 from [`results/ablation/kinematic_report.json`](kinematic_report.json), which records every number below along with the full episode specifications needed to re-run it. This file is rendered from that artifact by `pathfinder/ablation_writeup.py`; edit the generator, not this file.
+Generated 2026-08-21T19:46:06+00:00 from [`results/ablation/kinematic_report.json`](kinematic_report.json), which records every number below along with the full episode specifications needed to re-run it. This file is rendered from that artifact by `pathfinder/ablation_writeup.py`; edit the generator, not this file.
 
 > **Scope: pipeline-only.** Generated on the kinematic backend, which neither simulates real physics nor renders real scenes. These numbers verify the ablation pipeline end to end; they are not driving quality and must never be quoted as such. The real measurement comes from the CARLA backend.
 
@@ -19,12 +19,12 @@ Both arms drive identical seeded episodes — same routes, traffic, weather, con
 
 | Metric | Baseline (privileged) | Candidate (detector) | Difference (B − C) |
 |---|---|---|---|
-| Driving score | 48.3 | 48.26 | 0.04 |
-| Route completion | 0.483 | 0.4826 | 0.0004 |
+| Driving score | 92.01 | 92.0 | 0.01 |
+| Route completion | 0.9201 | 0.92 | 0.0001 |
 | Infraction penalty | 1.0 | 1.0 | 0.0 |
 | Collisions per km | 0.0 | 0.0 | — |
 | Failures | 0 | 0 | — |
-| Mean perception latency (ms) | 0.0 | 97.433 | — |
+| Mean perception latency (ms) | 0.0 | 102.357 | — |
 
 A positive difference means the candidate's perception cost driving performance.
 
@@ -36,6 +36,6 @@ Neither arm committed a scoreable or tracked infraction.
 
 | Episode | Town | Weather | Seed | Baseline | Candidate | Delta | Flag |
 |---|---|---|---|---|---|---|---|
-| ep-0000 | Town01 | ClearNoon | 1000 | 52.21 | 52.21 | 0.0 |  |
-| ep-0001 | Town03 | ClearSunset | 1001 | 42.01 | 41.89 | 0.12 |  |
-| ep-0002 | Town05 | HardRainNoon | 1002 | 50.69 | 50.69 | 0.0 |  |
+| ep-0000 | Town01 | ClearNoon | 1000 | 100.0 | 100.0 | 0.0 |  |
+| ep-0001 | Town03 | ClearSunset | 1001 | 83.04 | 83.02 | 0.03 |  |
+| ep-0002 | Town05 | HardRainNoon | 1002 | 92.98 | 92.98 | 0.0 |  |
