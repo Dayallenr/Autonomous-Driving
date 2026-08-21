@@ -149,6 +149,48 @@ git commit -m "Run the GT-vs-Detector ablation on CARLA (#10)"
 git push
 ```
 
+## 8. BehaviorAgent reference Episode on CARLA (issue #16)
+
+One short sitting, unattended once started — batch it at the start of any
+CARLA sitting (it is the prerequisite for the DAgger sitting, #25). It scores
+CARLA's own behaviour agent — **not project work**, recorded as such in the
+artifact — over the ablation's exact 10 seeded episodes, and prints the
+go / stop-and-reassess verdict against the recorded PurePursuit floor.
+
+Start `CarlaUE4.exe`, wait for the town to load, then in the CARLA venv:
+
+```powershell
+git pull
+.\.venv\Scripts\Activate.ps1   # the CARLA venv, Python 3.12
+python -m pathfinder.reference_run --backend carla
+```
+
+No Detector runs, so this is the fast kind of arm — at the recorded 172–181
+ticks/s (`results/carla/probe.json`) budget well under an hour. Every
+finished episode's score lands in
+`results/reference/carla_report.partial.jsonl` as it completes, so no data
+is silently lost — but there is no resume: a crash means re-running the
+whole command from episode 0 after fixing whatever crashed.
+
+It writes two artifacts:
+
+- `results/reference/carla_report.json` — every number, spec, and seed, plus
+  the computed floor gate
+- `results/reference/carla_report.md` — the generated write-up (scope label,
+  not-project-work banner, infraction breakdown, gate verdict)
+
+Then push them back:
+
+```powershell
+git add results/reference
+git commit -m "Record the BehaviorAgent reference baseline on CARLA (#16)"
+git push
+```
+
+Then tell the agent the run is done — the review is agent work: quoting the
+score and the printed go / stop-and-reassess verdict on #16 and on #11,
+**before** any training happens (the gate paragraph in #16 requires it).
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

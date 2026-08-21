@@ -130,6 +130,12 @@ class CarlaBehaviorAgentPolicy:
         self._agent = None
         self._bound_vehicle_id: int | None = None
 
+    @property
+    def behavior(self) -> str:
+        """The CARLA behaviour preset, exposed so result artifacts can record
+        which one produced their numbers."""
+        return self._behavior
+
     def plan(self, state: FrameState) -> ControlOutput:
         """Ask the agent for a control. ``state`` is ignored — the agent reads
         the world directly, which is exactly what makes it privileged."""
