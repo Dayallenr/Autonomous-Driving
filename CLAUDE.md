@@ -217,7 +217,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-352 tests pass on the Mac; `ruff check` clean.
+379 tests pass on the Mac; `ruff check` clean.
 
 ---
 
@@ -228,8 +228,11 @@ validated (#5), the ablation is done with real numbers (#10), the DAgger
 CLI + run artifacts landed (#20, closed 2026-08-20), and the scoring side
 landed (#21, 2026-08-20): `cil_student` in the registry plus the
 three-column comparison suite (`pathfinder/comparison.py`). Before the GPU
-sitting (#25) can happen, one ticket remains: #16 (behaviour-agent live
-Episode — mostly a user sitting). Nothing has been trained yet. Known
+sitting (#25) can happen, one ticket remains: #16 — its agent side landed
+2026-08-21 (`python -m pathfinder.reference_run --backend carla`, runbook
+section 8 in `docs/SETUP_WINDOWS.md`, gate pre-registered at ≥ 10 points
+over the ablation's recorded floor), so what remains is the user's short
+CARLA sitting. Nothing has been trained yet. Known
 limits of #21 to keep in view: the real three-column CARLA run has not
 happened (the kinematic run records the behaviour-agent column as skipped),
 and the phase-5 worker path (`EpisodeWorker`) cannot pass `weights=` yet, so
@@ -293,6 +296,12 @@ pathfinder/
               enforced; CLI mirrors ablation.py (partial checkpoints, report)
   comparison_writeup.py — renders a policy_comparison report into Markdown
               (boundary + not-project-work + weak-floor sentences, golden-tested)
+  reference_run.py — scores the behaviour agent alone over the ablation's
+              exact suite (#16): not-project-work baked into the artifact, the
+              go/stop floor gate computed from the ablation report (never a
+              hardcoded 25.2), CLI mirrors ablation.py (partial checkpoints)
+  reference_writeup.py — renders a reference_baseline report into Markdown
+              (not-project-work banner, scope label, gate verdict)
   ablation.py — the GT-vs-Detector ablation: run_ablation() + CLI; provenance
               observed from telemetry, kinematic reports labelled pipeline-only
   ablation_writeup.py — renders a report JSON into its Markdown write-up
