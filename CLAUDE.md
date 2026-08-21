@@ -222,7 +222,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | **In progress** — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table (#24) and README opt-in (#23) are next |
 
-393 tests pass on the Mac; `ruff check` clean.
+413 tests pass on the Mac; `ruff check` clean.
 
 ---
 
@@ -312,6 +312,12 @@ pathfinder/
   ablation_writeup.py — renders a report JSON into its Markdown write-up
               (scope banner, boundary sentence, infraction breakdown,
               binding-constraint verdict); called by the ablation CLI
+  reporting.py — the one home (#29) for what every report kind above shares:
+              the scope rule (only CARLA earns driving-quality), ReportArtifact
+              (partial checkpoints + report/write-up landing, utf-8 explicit),
+              the CLI tail, common write-up helpers, and the write-up
+              regenerator CLI. A new report kind starts here, not by copying
+              a sibling
   claims.py — the claim checker (#19): parses the citation convention of
               docs/CLAIMS.md out of opted-in documents and verifies every
               quoted number against its artifact's JSON field; enforced by

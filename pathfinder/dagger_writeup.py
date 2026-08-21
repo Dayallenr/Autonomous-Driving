@@ -16,11 +16,10 @@ land together.
 """
 from __future__ import annotations
 
-import argparse
-import json
 from pathlib import Path
 
 from pathfinder.policies import CarlaBehaviorAgentPolicy
+from pathfinder.reporting import regenerate_writeup_main, scope_banner
 
 __all__ = ["render_writeup"]
 
@@ -103,7 +102,7 @@ def render_writeup(report: dict, *, source: str) -> str:
         "from that artifact by `pathfinder/dagger_writeup.py`; edit the "
         "generator, not this file.",
         "",
-        f"> **Scope: {report['scope']}.** {report['scope_note']}",
+        scope_banner(report),
         "",
         "## Setup",
         "",
@@ -165,21 +164,12 @@ def render_writeup(report: dict, *, source: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Regenerate the Markdown write-up for a DAgger run report."
+    return regenerate_writeup_main(
+        argv,
+        kind="dagger_run",
+        render_writeup=render_writeup,
+        description="Regenerate the Markdown write-up for a DAgger run report.",
     )
-    parser.add_argument("report", type=Path, help="path to a dagger_run JSON report")
-    args = parser.parse_args(argv)
-
-    report = json.loads(args.report.read_text(encoding="utf-8"))
-    if report.get("kind") != "dagger_run":
-        raise SystemExit(f"{args.report} is not a dagger_run report")
-    output = args.report.with_suffix(".md")
-    # See the note in ablation.py: the rendered write-up is not ASCII, and
-    # write_text without an explicit encoding uses cp1252 on Windows.
-    output.write_text(render_writeup(report, source=str(args.report)), encoding="utf-8")
-    print(f"write-up written to {output}")
-    return 0
 
 
 if __name__ == "__main__":

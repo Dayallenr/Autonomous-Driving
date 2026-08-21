@@ -17,16 +17,18 @@ artifacts land together.
 """
 from __future__ import annotations
 
-import argparse
-import json
 import statistics
-from pathlib import Path
+
+from pathfinder.reporting import (
+    SCOPE_DRIVING_QUALITY,
+    generated_from,
+    infraction_table,
+    regenerate_writeup_main,
+    scope_banner,
+    suite_section,
+)
 
 __all__ = ["render_writeup"]
-
-
-def _unique_in_order(values: list[str]) -> list[str]:
-    return list(dict.fromkeys(values))
 
 
 def _results_table(report: dict) -> list[str]:
@@ -58,17 +60,13 @@ def _results_table(report: dict) -> list[str]:
 
 
 def _infraction_table(report: dict) -> list[str]:
-    baseline = report["baseline"]["summary"]["infraction_totals"]
-    candidate = report["candidate"]["summary"]["infraction_totals"]
-    names = sorted(set(baseline) | set(candidate))
-    if not names:
-        return ["Neither arm committed a scoreable or tracked infraction."]
-    lines = [
-        "| Infraction | Baseline | Candidate |",
-        "|---|---|---|",
-    ]
-    lines += [f"| {name} | {baseline.get(name, 0)} | {candidate.get(name, 0)} |" for name in names]
-    return lines
+    return infraction_table(
+        [
+            ("Baseline", report["baseline"]["summary"]["infraction_totals"]),
+            ("Candidate", report["candidate"]["summary"]["infraction_totals"]),
+        ],
+        empty_message="Neither arm committed a scoreable or tracked infraction.",
+    )
 
 
 def _per_episode_table(report: dict) -> list[str]:
@@ -159,22 +157,16 @@ def render_writeup(report: dict, *, source: str) -> str:
         source: Path of the report artifact, as the write-up should cite it —
             the traceability link from every number back to the run.
     """
-    specs = report["episodes"]
-    towns = _unique_in_order([spec["town"] for spec in specs])
-    weathers = _unique_in_order([spec["weather"] for spec in specs])
-    seeds = [spec["seed"] for spec in specs]
-    driving_quality = report["scope"] == "driving-quality"
+    driving_quality = report["scope"] == SCOPE_DRIVING_QUALITY
 
     lines = [
         f"# Perception ablation — {report['backend']} backend",
         "",
-        f"Generated {report['generated_at']} from [`{source}`]"
-        f"({Path(source).name}), which records every number below along with "
-        "the full episode specifications needed to re-run it. This file is "
-        "rendered from that artifact by `pathfinder/ablation_writeup.py`; edit "
-        "the generator, not this file.",
+        generated_from(
+            report, source=source, generator="pathfinder/ablation_writeup.py"
+        ),
         "",
-        f"> **Scope: {report['scope']}.** {report['scope_note']}",
+        scope_banner(report),
         "",
         "## What differs between the arms",
         "",
@@ -188,12 +180,7 @@ def render_writeup(report: dict, *, source: str) -> str:
         "class and localization is a map problem. Claiming more than this "
         "boundary would be false.",
         "",
-        "## Suite",
-        "",
-        f"- Episodes per arm: {len(specs)}",
-        f"- Towns: {', '.join(towns)}",
-        f"- Weathers: {', '.join(weathers)}",
-        f"- Seeds: {min(seeds)}–{max(seeds)}",
+        *suite_section(report["episodes"], episodes_label="Episodes per arm"),
         "",
         "## Results",
         "",
@@ -248,21 +235,12 @@ def render_writeup(report: dict, *, source: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Regenerate the Markdown write-up for an ablation report."
+    return regenerate_writeup_main(
+        argv,
+        kind="perception_ablation",
+        render_writeup=render_writeup,
+        description="Regenerate the Markdown write-up for an ablation report.",
     )
-    parser.add_argument("report", type=Path, help="path to a perception_ablation JSON report")
-    args = parser.parse_args(argv)
-
-    report = json.loads(args.report.read_text(encoding="utf-8"))
-    if report.get("kind") != "perception_ablation":
-        raise SystemExit(f"{args.report} is not a perception_ablation report")
-    output = args.report.with_suffix(".md")
-    # See the note in ablation.py: the rendered write-up is not ASCII, and
-    # write_text without an explicit encoding uses cp1252 on Windows.
-    output.write_text(render_writeup(report, source=str(args.report)), encoding="utf-8")
-    print(f"write-up written to {output}")
-    return 0
 
 
 if __name__ == "__main__":
