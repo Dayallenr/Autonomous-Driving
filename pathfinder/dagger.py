@@ -17,11 +17,14 @@ The fix is to train on the distribution the student actually induces:
 4. Retrain on everything collected so far.
 5. Repeat.
 
-The expert here is :class:`PurePursuitPolicy`, which is *privileged*: it reads
-exact cross-track error, heading error, and curvature from the simulator. The
-student sees only rendered pixels. That asymmetry is the point — the student
+The default expert is :class:`PurePursuitPolicy`, which is *privileged*: it
+reads exact cross-track error, heading error, and curvature from the simulator.
+The student sees only rendered pixels. That asymmetry is the point — the student
 learns to infer from images what the expert is handed directly, which is exactly
-the privileged-expert setup used by LBC and Roach.
+the privileged-expert setup used by LBC and Roach. Both the expert and the
+simulator backend are injectable through :func:`run_dagger`, so the same loop
+can be pointed at CARLA with a different Policy in the expert seat — though no
+CARLA-backed DAgger run has happened yet.
 
 Beta scheduling
 ---------------
@@ -66,8 +69,8 @@ import numpy as np
 import torch
 from torch import nn
 
-from pathfinder.runner import ControlOutput, PurePursuitPolicy
-from pathfinder.sim.base import EpisodeSpec, FrameState
+from pathfinder.runner import ControlOutput, Policy, PurePursuitPolicy
+from pathfinder.sim.base import EpisodeSpec, FrameState, SimulatorBackend
 from pathfinder.sim.kinematic import KinematicSimulator
 
 logger = logging.getLogger(__name__)
@@ -185,14 +188,14 @@ class DAggerReport:
         }
 
 
-def _expert_control(policy: PurePursuitPolicy, state: FrameState) -> np.ndarray:
+def _expert_control(policy: Policy, state: FrameState) -> np.ndarray:
     control = policy.plan(state)
     return np.array([control.steer, control.throttle, control.brake], dtype=np.float32)
 
 
 def _collect(
-    simulator: KinematicSimulator,
-    expert: PurePursuitPolicy,
+    simulator: SimulatorBackend,
+    expert: Policy,
     student: CILPolicy | None,
     spec: EpisodeSpec,
     beta: float,
@@ -244,9 +247,21 @@ def run_dagger(
     config: DAggerConfig | None = None,
     *,
     model: nn.Module | None = None,
+    simulator: SimulatorBackend | None = None,
+    expert: Policy | None = None,
     progress: bool = True,
 ) -> tuple[nn.Module, DAggerReport]:
     """Run the DAgger loop and return the trained student plus its report.
+
+    Args:
+        simulator: Backend to roll out in. Must produce rendered frames
+            (``FrameState.image``) — the student is trained on pixels. Defaults
+            to ``KinematicSimulator(render=True)``. An injected simulator is
+            **not** closed here; the caller that opened it owns its lifetime
+            (a CARLA connection outlives any one training run). The default,
+            internally-constructed one is closed on exit as before.
+        expert: Labeller for every visited state; anything satisfying
+            :class:`Policy`. Defaults to :class:`PurePursuitPolicy`.
 
     Raises:
         ValueError: If ``config.iterations`` is below 2 — error *reduction* is
@@ -269,8 +284,11 @@ def run_dagger(
         model = CILModel(pretrained=False, output_mode="control")
     model = model.to(config.device)
 
-    expert = PurePursuitPolicy()
-    simulator = KinematicSimulator(render=True)
+    if expert is None:
+        expert = PurePursuitPolicy()
+    owns_simulator = simulator is None
+    if simulator is None:
+        simulator = KinematicSimulator(render=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     criterion = nn.L1Loss()
 
@@ -345,7 +363,8 @@ def run_dagger(
                     completion,
                 )
     finally:
-        simulator.close()
+        if owns_simulator:
+            simulator.close()
 
     # Error reduction compares the first *measured* disagreement (iteration 1,
     # since iteration 0 has no student) to the last.
