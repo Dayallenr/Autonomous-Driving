@@ -90,11 +90,19 @@ def add_telemetry_args(
     *,
     backend_default: str = "none",
     optional: bool = True,
-    backend_help: str = "Which telemetry stream backend to use; 'none' skips telemetry entirely.",
+    backend_help: str | None = None,
 ) -> None:
     """Mount the telemetry-stream flag group; :func:`stream_from_args` reads
     it back. ``optional=False`` drops the 'none' choice — for CLIs whose whole
-    job is the telemetry stream, where skipping it is meaningless."""
+    job is the telemetry stream, where skipping it is meaningless. The default
+    ``backend_help`` follows ``optional``, so --help never advertises a 'none'
+    value the parser would reject."""
+    if backend_help is None:
+        backend_help = (
+            "Which telemetry stream backend to use; 'none' skips telemetry entirely."
+            if optional
+            else "Which telemetry stream backend to drain."
+        )
     choices = (["none"] if optional else []) + ["local", "kinesis"]
     parser.add_argument(
         "--telemetry-backend", choices=choices, default=backend_default, help=backend_help

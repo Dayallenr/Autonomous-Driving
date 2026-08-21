@@ -13,6 +13,7 @@ Usage (LocalStack, the docker-compose default):
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -35,6 +36,13 @@ def main() -> None:
         "enqueued rather than a reconstruction from matching flags.",
     )
     args = parser.parse_args()
+
+    # Bare messages on stdout, so queue_from_args's "resolved queue ... to
+    # ..." line keeps printing exactly as this script always has — a line
+    # the #22 runbook's transcript reads. INFO is opened only for that
+    # module's logger; at root level it would let botocore chatter through.
+    logging.basicConfig(format="%(message)s", stream=sys.stdout)
+    logging.getLogger("pathfinder.cloud.cli").setLevel(logging.INFO)
 
     queue = cloud_cli.queue_from_args(args)
 

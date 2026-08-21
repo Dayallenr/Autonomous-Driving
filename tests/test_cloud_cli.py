@@ -100,6 +100,9 @@ class TestTelemetryArgs:
         assert parser.parse_args([]).telemetry_backend == "kinesis"
         with pytest.raises(SystemExit):
             parser.parse_args(["--telemetry-backend", "none"])
+        # The default help must not advertise the 'none' value the parser
+        # just rejected.
+        assert "none" not in parser.format_help()
 
     def test_none_builds_no_stream(self):
         assert cli.stream_from_args(parse(cli.add_telemetry_args)) is None

@@ -284,6 +284,12 @@ async def collect_report(
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Imported here rather than at module top for the same reason as in the
+    # sibling CLIs: the library-level builder has no business importing the
+    # queue, stream, and store backends its arguments duck-type — and
+    # pathfinder.cloud.cli imports all of them.
+    from pathfinder.cloud import cli as cloud_cli
+
     parser = argparse.ArgumentParser(
         description=(
             "Collect a distributed benchmark run into one report artifact: "
@@ -292,12 +298,6 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     parser.add_argument("--coordinator", type=str, required=True, help="host:port")
-
-    # Imported here rather than at module top for the same reason as in the
-    # sibling CLIs: the library-level builder has no business importing the
-    # queue, stream, and store backends its arguments duck-type — and
-    # pathfinder.cloud.cli imports all of them.
-    from pathfinder.cloud import cli as cloud_cli
 
     parser.add_argument(
         "--suite", type=Path, default=None,
