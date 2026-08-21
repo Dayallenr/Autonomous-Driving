@@ -241,6 +241,26 @@ def test_cli_reports_coverage_counts_and_fails_on_drift(tmp_path, capsys):
     assert "9.9" in capsys.readouterr().out
 
 
+def test_claims_table_exists_and_carries_both_claim_kinds():
+    """The claims table (issue #24) is the claim-of-record at the repo root.
+
+    It must opt in to the checker and enumerate both kinds of claim: the
+    numeric findings (machine-checked) and the negative/boundary claims
+    (prose-audited). Exact counts would be brittle; what this pins is that
+    the table exists, is checked, and neither kind has been emptied out.
+    """
+    table = REPO_ROOT / "CLAIMS.md"
+
+    assert table.is_file()
+    assert CHECKED_MARKER in table.read_text(encoding="utf-8")
+
+    report = check_document(table)
+
+    assert report.failures == []
+    assert report.machine_checked > 0
+    assert report.prose_audited > 0
+
+
 def test_real_repo_documents_pass_the_checker():
     """The real gate: every opted-in document in this repo checks out.
 
