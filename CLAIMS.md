@@ -105,7 +105,19 @@ Service pinned by `tests/test_rpc.py`.
 |---|---|
 | Coordinator round-trip p50 over loopback, [500](results/rpc/latency_report.json "claim:calls_per_rpc") calls per RPC: RegisterWorker [0.26](results/rpc/latency_report.json "claim:results.0.p50_ms") ms, Heartbeat [0.26](results/rpc/latency_report.json "claim:results.1.p50_ms") ms, SubmitResult [0.26](results/rpc/latency_report.json "claim:results.2.p50_ms") ms, GetRunStatus [0.82](results/rpc/latency_report.json "claim:results.3.p50_ms") ms. | machine-checked |
 
-## 7. Boundaries and negative claims
+## 7. The BehaviorAgent reference ceiling and the training gate
+
+Reproduce: `python -m pathfinder.reference_run --backend carla` (needs a live
+CARLA 0.9.16 server on the Windows machine). Mechanism pinned CARLA-free by
+`tests/test_reference_run.py`; write-up by `tests/test_reference_writeup.py`.
+
+| Claim | Kind |
+|---|---|
+| CARLA's built-in behaviour agent — **not project work** — scores driving score [31.33](results/reference/carla_report.json "claim:summary.driving_score") over the ablation's exact seeded suite ([10](results/reference/carla_report.json "claim:summary.episodes") episodes, [0](results/reference/carla_report.json "claim:summary.failures") failures), route completion [0.368](results/reference/carla_report.json "claim:summary.route_completion"), with [3](results/reference/carla_report.json "claim:summary.infraction_totals.collision_vehicle") vehicle collisions and [6](results/reference/carla_report.json "claim:summary.infraction_totals.agent_blocked") of 10 episodes ended agent-blocked. | machine-checked |
+| The pre-registered training gate: reference [31.33](results/reference/carla_report.json "claim:floor_gate.reference_driving_score") over the recorded privileged-PurePursuit floor [25.2](results/reference/carla_report.json "claim:floor_gate.floor_driving_score") is a margin of [6.13](results/reference/carla_report.json "claim:floor_gate.margin") points, short of the required [10.0](results/reference/carla_report.json "claim:floor_gate.required_margin"). | machine-checked |
+| [The gate's verdict is **stop-and-reassess**](results/reference/carla_report.json "claim:prose"): under the rule pre-registered before the run, no DAgger training happens until the reassessment (#11). The margin is computed by the gate code from the ablation artifact, never hardcoded. | prose-audited |
+
+## 8. Boundaries and negative claims
 
 These are the claims about what this project is *not*. They are all
 prose-audited: the checker verifies the evidence exists; review holds the
@@ -118,7 +130,7 @@ sentences true.
 | [The SQS queue code carries real visibility-timeout and DLQ semantics](pathfinder/cloud/queue.py "claim:prose") and is tested against emulation; no live AWS queue has been used yet (that is ticket #18/#26). | `pathfinder/cloud/queue.py` |
 | Kubernetes orchestration runs on [kind](k8s/kind-config.yaml "claim:prose"), with an EKS overlay — "Kubernetes, with EKS-ready Terraform", **not** "deployed on EKS". | `k8s/` |
 | [SageMaker integration is the real SageMaker SDK in local mode](pathfinder/cloud/training.py "claim:prose") — local Docker, zero spend. | `pathfinder/cloud/training.py` |
-| [`carla_builtin_behavior_agent` is CARLA's own behaviour agent, **not project work**](pathfinder/policies.py "claim:prose"): its driving score is a reference upper bound only, and it has never been run against a live server. | `pathfinder/policies.py` |
+| [`carla_builtin_behavior_agent` is CARLA's own behaviour agent, **not project work**](pathfinder/policies.py "claim:prose"): its driving score is a reference upper bound only — measured live once by the #16 reference baseline (section 7) and quotable only as a ceiling, never as this project's driving. | `pathfinder/policies.py`, `results/reference/carla_report.json` |
 | [No learned policy has been trained yet](pathfinder/dagger.py "claim:prose"): the DAgger loop, checkpointing, and scored comparison are proven CARLA-free with untrained weights; training awaits the GPU sitting (#25). | `pathfinder/dagger.py` |
 | The detector's KITTI numbers are on synthetic-free real imagery; [driving it in CARLA is out-of-domain](results/ablation/carla_report.json "claim:prose"), which the ablation quantifies rather than hides. | `results/ablation/carla_report.json` |
 
