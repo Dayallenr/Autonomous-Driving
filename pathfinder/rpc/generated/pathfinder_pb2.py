@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10pathfinder.proto\x12\rpathfinder.v1\"\xc5\x01\n\x0b\x45pisodeSpec\x12\x12\n\nepisode_id\x18\x01 \x01(\t\x12\x0c\n\x04town\x18\x02 \x01(\t\x12\x0f\n\x07weather\x18\x03 \x01(\t\x12\x16\n\x0eroute_length_m\x18\x04 \x01(\x01\x12\x0c\n\x04seed\x18\x05 \x01(\x05\x12\x11\n\tmax_steps\x18\x06 \x01(\x05\x12\x15\n\rdelta_seconds\x18\x07 \x01(\x01\x12\x17\n\x0ftraffic_density\x18\x08 \x01(\x01\x12\x1a\n\x12pedestrian_density\x18\t \x01(\x01\".\n\x0fInfractionCount\x12\x0c\n\x04kind\x18\x01 \x01(\t\x12\r\n\x05\x63ount\x18\x02 \x01(\x05\"\xa1\x03\n\rEpisodeResult\x12\x12\n\nepisode_id\x18\x01 \x01(\t\x12\x11\n\tworker_id\x18\x02 \x01(\t\x12\x18\n\x10route_completion\x18\x03 \x01(\x01\x12\x1a\n\x12infraction_penalty\x18\x04 \x01(\x01\x12\x15\n\rdriving_score\x18\x05 \x01(\x01\x12\x33\n\x0binfractions\x18\x06 \x03(\x0b\x32\x1e.pathfinder.v1.InfractionCount\x12\x1c\n\x14\x64istance_travelled_m\x18\x07 \x01(\x01\x12\x16\n\x0eroute_length_m\x18\x08 \x01(\x01\x12\x0e\n\x06\x66rames\x18\t \x01(\x03\x12\x18\n\x10\x64uration_seconds\x18\n \x01(\x01\x12\x10\n\x08mean_fps\x18\x0b \x01(\x01\x12\x0e\n\x06status\x18\x0c \x01(\t\x12\x1a\n\x12termination_reason\x18\r \x01(\t\x12\x15\n\rmodel_version\x18\x0e \x01(\t\x12\x17\n\x0f\x64\x61taset_version\x18\x0f \x01(\t\x12\x19\n\x11simulator_backend\x18\x10 \x01(\t\"e\n\x0fRegisterRequest\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x10\n\x08hostname\x18\x02 \x01(\t\x12\x19\n\x11simulator_backend\x18\x03 \x01(\t\x12\x12\n\ncarla_port\x18\x04 \x01(\x05\"h\n\x10RegisterResponse\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x0e\n\x06run_id\x18\x02 \x01(\t\x12\"\n\x1aheartbeat_interval_seconds\x18\x03 \x01(\x01\x12\x0e\n\x06reason\x18\x04 \x01(\t\"\x91\x01\n\x10HeartbeatRequest\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x1a\n\x12\x63urrent_episode_id\x18\x02 \x01(\t\x12\x18\n\x10\x66rames_completed\x18\x03 \x01(\x03\x12\x18\n\x10\x65pisode_progress\x18\x04 \x01(\x01\x12\x1a\n\x12\x65pisodes_completed\x18\x05 \x01(\x05\"8\n\x11HeartbeatResponse\x12\x13\n\x0bshould_stop\x18\x01 \x01(\x08\x12\x0e\n\x06reason\x18\x02 \x01(\t\"C\n\x13SubmitResultRequest\x12,\n\x06result\x18\x01 \x01(\x0b\x32\x1c.pathfinder.v1.EpisodeResult\";\n\x14SubmitResultResponse\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x11\n\tduplicate\x18\x02 \x01(\x08\"\"\n\x10RunStatusRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\t\"\xa5\x01\n\x0cWorkerStatus\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x1a\n\x12\x63urrent_episode_id\x18\x02 \x01(\t\x12\x18\n\x10\x65pisode_progress\x18\x03 \x01(\x01\x12\x1a\n\x12\x65pisodes_completed\x18\x04 \x01(\x05\x12\x1f\n\x17seconds_since_heartbeat\x18\x05 \x01(\x01\x12\x0f\n\x07healthy\x18\x06 \x01(\x08\"\xf5\x01\n\x11RunStatusResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x16\n\x0e\x65pisodes_total\x18\x02 \x01(\x05\x12\x1a\n\x12\x65pisodes_completed\x18\x03 \x01(\x05\x12\x1a\n\x12\x65pisodes_in_flight\x18\x04 \x01(\x05\x12\x1a\n\x12mean_driving_score\x18\x05 \x01(\x01\x12\x1d\n\x15mean_route_completion\x18\x06 \x01(\x01\x12,\n\x07workers\x18\x07 \x03(\x0b\x32\x1b.pathfinder.v1.WorkerStatus\x12\x17\n\x0f\x65lapsed_seconds\x18\x08 \x01(\x01\x32\xad\x03\n\x0b\x43oordinator\x12Q\n\x0eRegisterWorker\x12\x1e.pathfinder.v1.RegisterRequest\x1a\x1f.pathfinder.v1.RegisterResponse\x12N\n\tHeartbeat\x12\x1f.pathfinder.v1.HeartbeatRequest\x1a .pathfinder.v1.HeartbeatResponse\x12W\n\x0cSubmitResult\x12\".pathfinder.v1.SubmitResultRequest\x1a#.pathfinder.v1.SubmitResultResponse\x12Q\n\x0cGetRunStatus\x12\x1f.pathfinder.v1.RunStatusRequest\x1a .pathfinder.v1.RunStatusResponse\x12O\n\x08WatchRun\x12\x1f.pathfinder.v1.RunStatusRequest\x1a .pathfinder.v1.RunStatusResponse0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10pathfinder.proto\x12\rpathfinder.v1\"\xc5\x01\n\x0b\x45pisodeSpec\x12\x12\n\nepisode_id\x18\x01 \x01(\t\x12\x0c\n\x04town\x18\x02 \x01(\t\x12\x0f\n\x07weather\x18\x03 \x01(\t\x12\x16\n\x0eroute_length_m\x18\x04 \x01(\x01\x12\x0c\n\x04seed\x18\x05 \x01(\x05\x12\x11\n\tmax_steps\x18\x06 \x01(\x05\x12\x15\n\rdelta_seconds\x18\x07 \x01(\x01\x12\x17\n\x0ftraffic_density\x18\x08 \x01(\x01\x12\x1a\n\x12pedestrian_density\x18\t \x01(\x01\".\n\x0fInfractionCount\x12\x0c\n\x04kind\x18\x01 \x01(\t\x12\r\n\x05\x63ount\x18\x02 \x01(\x05\"\xb8\x03\n\rEpisodeResult\x12\x12\n\nepisode_id\x18\x01 \x01(\t\x12\x11\n\tworker_id\x18\x02 \x01(\t\x12\x18\n\x10route_completion\x18\x03 \x01(\x01\x12\x1a\n\x12infraction_penalty\x18\x04 \x01(\x01\x12\x15\n\rdriving_score\x18\x05 \x01(\x01\x12\x33\n\x0binfractions\x18\x06 \x03(\x0b\x32\x1e.pathfinder.v1.InfractionCount\x12\x1c\n\x14\x64istance_travelled_m\x18\x07 \x01(\x01\x12\x16\n\x0eroute_length_m\x18\x08 \x01(\x01\x12\x0e\n\x06\x66rames\x18\t \x01(\x03\x12\x18\n\x10\x64uration_seconds\x18\n \x01(\x01\x12\x10\n\x08mean_fps\x18\x0b \x01(\x01\x12\x0e\n\x06status\x18\x0c \x01(\t\x12\x1a\n\x12termination_reason\x18\r \x01(\t\x12\x15\n\rmodel_version\x18\x0e \x01(\t\x12\x17\n\x0f\x64\x61taset_version\x18\x0f \x01(\t\x12\x19\n\x11simulator_backend\x18\x10 \x01(\t\x12\x15\n\rreceive_count\x18\x11 \x01(\x05\"e\n\x0fRegisterRequest\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x10\n\x08hostname\x18\x02 \x01(\t\x12\x19\n\x11simulator_backend\x18\x03 \x01(\t\x12\x12\n\ncarla_port\x18\x04 \x01(\x05\"h\n\x10RegisterResponse\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x0e\n\x06run_id\x18\x02 \x01(\t\x12\"\n\x1aheartbeat_interval_seconds\x18\x03 \x01(\x01\x12\x0e\n\x06reason\x18\x04 \x01(\t\"\x91\x01\n\x10HeartbeatRequest\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x1a\n\x12\x63urrent_episode_id\x18\x02 \x01(\t\x12\x18\n\x10\x66rames_completed\x18\x03 \x01(\x03\x12\x18\n\x10\x65pisode_progress\x18\x04 \x01(\x01\x12\x1a\n\x12\x65pisodes_completed\x18\x05 \x01(\x05\"8\n\x11HeartbeatResponse\x12\x13\n\x0bshould_stop\x18\x01 \x01(\x08\x12\x0e\n\x06reason\x18\x02 \x01(\t\"C\n\x13SubmitResultRequest\x12,\n\x06result\x18\x01 \x01(\x0b\x32\x1c.pathfinder.v1.EpisodeResult\";\n\x14SubmitResultResponse\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x01 \x01(\x08\x12\x11\n\tduplicate\x18\x02 \x01(\x08\"\"\n\x10RunStatusRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\t\"#\n\x11RunResultsRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\t\"r\n\x12RunResultsResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12-\n\x07results\x18\x02 \x03(\x0b\x32\x1c.pathfinder.v1.EpisodeResult\x12\x1d\n\x15\x64uplicate_submissions\x18\x03 \x01(\x05\"\xa5\x01\n\x0cWorkerStatus\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x1a\n\x12\x63urrent_episode_id\x18\x02 \x01(\t\x12\x18\n\x10\x65pisode_progress\x18\x03 \x01(\x01\x12\x1a\n\x12\x65pisodes_completed\x18\x04 \x01(\x05\x12\x1f\n\x17seconds_since_heartbeat\x18\x05 \x01(\x01\x12\x0f\n\x07healthy\x18\x06 \x01(\x08\"\xf5\x01\n\x11RunStatusResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x16\n\x0e\x65pisodes_total\x18\x02 \x01(\x05\x12\x1a\n\x12\x65pisodes_completed\x18\x03 \x01(\x05\x12\x1a\n\x12\x65pisodes_in_flight\x18\x04 \x01(\x05\x12\x1a\n\x12mean_driving_score\x18\x05 \x01(\x01\x12\x1d\n\x15mean_route_completion\x18\x06 \x01(\x01\x12,\n\x07workers\x18\x07 \x03(\x0b\x32\x1b.pathfinder.v1.WorkerStatus\x12\x17\n\x0f\x65lapsed_seconds\x18\x08 \x01(\x01\x32\x83\x04\n\x0b\x43oordinator\x12Q\n\x0eRegisterWorker\x12\x1e.pathfinder.v1.RegisterRequest\x1a\x1f.pathfinder.v1.RegisterResponse\x12N\n\tHeartbeat\x12\x1f.pathfinder.v1.HeartbeatRequest\x1a .pathfinder.v1.HeartbeatResponse\x12W\n\x0cSubmitResult\x12\".pathfinder.v1.SubmitResultRequest\x1a#.pathfinder.v1.SubmitResultResponse\x12Q\n\x0cGetRunStatus\x12\x1f.pathfinder.v1.RunStatusRequest\x1a .pathfinder.v1.RunStatusResponse\x12T\n\rGetRunResults\x12 .pathfinder.v1.RunResultsRequest\x1a!.pathfinder.v1.RunResultsResponse\x12O\n\x08WatchRun\x12\x1f.pathfinder.v1.RunStatusRequest\x1a .pathfinder.v1.RunStatusResponse0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,25 +36,29 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_INFRACTIONCOUNT']._serialized_start=235
   _globals['_INFRACTIONCOUNT']._serialized_end=281
   _globals['_EPISODERESULT']._serialized_start=284
-  _globals['_EPISODERESULT']._serialized_end=701
-  _globals['_REGISTERREQUEST']._serialized_start=703
-  _globals['_REGISTERREQUEST']._serialized_end=804
-  _globals['_REGISTERRESPONSE']._serialized_start=806
-  _globals['_REGISTERRESPONSE']._serialized_end=910
-  _globals['_HEARTBEATREQUEST']._serialized_start=913
-  _globals['_HEARTBEATREQUEST']._serialized_end=1058
-  _globals['_HEARTBEATRESPONSE']._serialized_start=1060
-  _globals['_HEARTBEATRESPONSE']._serialized_end=1116
-  _globals['_SUBMITRESULTREQUEST']._serialized_start=1118
-  _globals['_SUBMITRESULTREQUEST']._serialized_end=1185
-  _globals['_SUBMITRESULTRESPONSE']._serialized_start=1187
-  _globals['_SUBMITRESULTRESPONSE']._serialized_end=1246
-  _globals['_RUNSTATUSREQUEST']._serialized_start=1248
-  _globals['_RUNSTATUSREQUEST']._serialized_end=1282
-  _globals['_WORKERSTATUS']._serialized_start=1285
-  _globals['_WORKERSTATUS']._serialized_end=1450
-  _globals['_RUNSTATUSRESPONSE']._serialized_start=1453
-  _globals['_RUNSTATUSRESPONSE']._serialized_end=1698
-  _globals['_COORDINATOR']._serialized_start=1701
-  _globals['_COORDINATOR']._serialized_end=2130
+  _globals['_EPISODERESULT']._serialized_end=724
+  _globals['_REGISTERREQUEST']._serialized_start=726
+  _globals['_REGISTERREQUEST']._serialized_end=827
+  _globals['_REGISTERRESPONSE']._serialized_start=829
+  _globals['_REGISTERRESPONSE']._serialized_end=933
+  _globals['_HEARTBEATREQUEST']._serialized_start=936
+  _globals['_HEARTBEATREQUEST']._serialized_end=1081
+  _globals['_HEARTBEATRESPONSE']._serialized_start=1083
+  _globals['_HEARTBEATRESPONSE']._serialized_end=1139
+  _globals['_SUBMITRESULTREQUEST']._serialized_start=1141
+  _globals['_SUBMITRESULTREQUEST']._serialized_end=1208
+  _globals['_SUBMITRESULTRESPONSE']._serialized_start=1210
+  _globals['_SUBMITRESULTRESPONSE']._serialized_end=1269
+  _globals['_RUNSTATUSREQUEST']._serialized_start=1271
+  _globals['_RUNSTATUSREQUEST']._serialized_end=1305
+  _globals['_RUNRESULTSREQUEST']._serialized_start=1307
+  _globals['_RUNRESULTSREQUEST']._serialized_end=1342
+  _globals['_RUNRESULTSRESPONSE']._serialized_start=1344
+  _globals['_RUNRESULTSRESPONSE']._serialized_end=1458
+  _globals['_WORKERSTATUS']._serialized_start=1461
+  _globals['_WORKERSTATUS']._serialized_end=1626
+  _globals['_RUNSTATUSRESPONSE']._serialized_start=1629
+  _globals['_RUNSTATUSRESPONSE']._serialized_end=1874
+  _globals['_COORDINATOR']._serialized_start=1877
+  _globals['_COORDINATOR']._serialized_end=2392
 # @@protoc_insertion_point(module_scope)

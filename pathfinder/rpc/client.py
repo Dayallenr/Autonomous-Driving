@@ -22,7 +22,7 @@ from pathfinder.rpc.generated import pathfinder_pb2, pathfinder_pb2_grpc
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["CoordinatorClient", "episode_score_to_proto"]
+__all__ = ["CoordinatorClient", "episode_score_from_proto", "episode_score_to_proto"]
 
 
 def episode_score_to_proto(
@@ -32,13 +32,16 @@ def episode_score_to_proto(
     model_version: str = "",
     dataset_version: str = "",
     simulator_backend: str = "",
+    receive_count: int = 1,
 ) -> pathfinder_pb2.EpisodeResult:
     """Convert a local :class:`EpisodeScore` into the wire message.
 
     ``EpisodeScore`` has no worker/model/backend fields — ``run_episode``
     doesn't know which worker or model produced it, only how the drive went.
     Those get attached here, at the point where the result is about to leave
-    the process that does know.
+    the process that does know. ``receive_count`` is the queue's delivery
+    count for the message this episode arrived on; above 1 means the
+    crash-recovery redelivery path fired.
     """
     return pathfinder_pb2.EpisodeResult(
         episode_id=score.episode_id,
@@ -60,6 +63,29 @@ def episode_score_to_proto(
         model_version=model_version,
         dataset_version=dataset_version,
         simulator_backend=simulator_backend,
+        receive_count=receive_count,
+    )
+
+
+def episode_score_from_proto(result: pathfinder_pb2.EpisodeResult) -> EpisodeScore:
+    """The inverse of :func:`episode_score_to_proto`, minus the provenance
+    fields — those stay on the wire message, which is the row's home; this
+    reconstruction exists so a collected result can be aggregated with the
+    same :func:`pathfinder.metrics.driving_score.aggregate` the local runners
+    use. ``mean_fps`` is derived from frames and duration, so it needs no
+    field of its own."""
+    return EpisodeScore(
+        episode_id=result.episode_id,
+        route_completion=result.route_completion,
+        infraction_penalty=result.infraction_penalty,
+        driving_score=result.driving_score,
+        infractions={item.kind: item.count for item in result.infractions},
+        distance_travelled_m=result.distance_travelled_m,
+        route_length_m=result.route_length_m,
+        frames=result.frames,
+        duration_seconds=result.duration_seconds,
+        status=result.status,
+        termination_reason=result.termination_reason,
     )
 
 
@@ -170,6 +196,9 @@ class CoordinatorClient:
 
     async def get_run_status(self, run_id: str) -> pathfinder_pb2.RunStatusResponse:
         return await self._stub.GetRunStatus(pathfinder_pb2.RunStatusRequest(run_id=run_id))
+
+    async def get_run_results(self, run_id: str) -> pathfinder_pb2.RunResultsResponse:
+        return await self._stub.GetRunResults(pathfinder_pb2.RunResultsRequest(run_id=run_id))
 
     async def watch_run(self, run_id: str) -> AsyncIterator[pathfinder_pb2.RunStatusResponse]:
         async for status in self._stub.WatchRun(pathfinder_pb2.RunStatusRequest(run_id=run_id)):

@@ -6,9 +6,11 @@ contract: run a seeded suite, checkpoint every finished Episode against a
 crash, land one JSON report plus a generated Markdown write-up, and label in
 the artifact itself what the numbers are allowed to mean. By the time the
 reference run existed, each of those pieces had three near-copies (the Rule
-of Three, issue #29); this module is their one home. A fourth report kind —
-the Phase 5 distributed-run report is the candidate — should start here
-rather than copy a sibling.
+of Three, issue #29); this module is their one home. The fourth kind, the
+Phase 5 distributed-run report (``distributed_run.py``, issue #17), starts
+here too — it skips per-episode checkpointing because collection is a
+re-runnable moment, not an hours-long suite. A fifth kind should likewise
+start here rather than copy a sibling.
 
 Each report module still owns its *sentences* (what its scope note says, what
 its write-up claims); this module owns the *shapes* those sentences travel

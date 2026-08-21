@@ -54,6 +54,11 @@ class CoordinatorStub:
                 request_serializer=pathfinder__pb2.RunStatusRequest.SerializeToString,
                 response_deserializer=pathfinder__pb2.RunStatusResponse.FromString,
                 _registered_method=True)
+        self.GetRunResults = channel.unary_unary(
+                '/pathfinder.v1.Coordinator/GetRunResults',
+                request_serializer=pathfinder__pb2.RunResultsRequest.SerializeToString,
+                response_deserializer=pathfinder__pb2.RunResultsResponse.FromString,
+                _registered_method=True)
         self.WatchRun = channel.unary_stream(
                 '/pathfinder.v1.Coordinator/WatchRun',
                 request_serializer=pathfinder__pb2.RunStatusRequest.SerializeToString,
@@ -88,6 +93,12 @@ class CoordinatorServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetRunResults(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def WatchRun(self, request, context):
         """Server-streaming live progress, for a dashboard that should not poll.
         """
@@ -117,6 +128,11 @@ def add_CoordinatorServicer_to_server(servicer, server):
                     servicer.GetRunStatus,
                     request_deserializer=pathfinder__pb2.RunStatusRequest.FromString,
                     response_serializer=pathfinder__pb2.RunStatusResponse.SerializeToString,
+            ),
+            'GetRunResults': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetRunResults,
+                    request_deserializer=pathfinder__pb2.RunResultsRequest.FromString,
+                    response_serializer=pathfinder__pb2.RunResultsResponse.SerializeToString,
             ),
             'WatchRun': grpc.unary_stream_rpc_method_handler(
                     servicer.WatchRun,
@@ -232,6 +248,33 @@ class Coordinator:
             '/pathfinder.v1.Coordinator/GetRunStatus',
             pathfinder__pb2.RunStatusRequest.SerializeToString,
             pathfinder__pb2.RunStatusResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetRunResults(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/pathfinder.v1.Coordinator/GetRunResults',
+            pathfinder__pb2.RunResultsRequest.SerializeToString,
+            pathfinder__pb2.RunResultsResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -37,7 +37,7 @@ class InfractionCount(_message.Message):
     def __init__(self, kind: _Optional[str] = ..., count: _Optional[int] = ...) -> None: ...
 
 class EpisodeResult(_message.Message):
-    __slots__ = ("episode_id", "worker_id", "route_completion", "infraction_penalty", "driving_score", "infractions", "distance_travelled_m", "route_length_m", "frames", "duration_seconds", "mean_fps", "status", "termination_reason", "model_version", "dataset_version", "simulator_backend")
+    __slots__ = ("episode_id", "worker_id", "route_completion", "infraction_penalty", "driving_score", "infractions", "distance_travelled_m", "route_length_m", "frames", "duration_seconds", "mean_fps", "status", "termination_reason", "model_version", "dataset_version", "simulator_backend", "receive_count")
     EPISODE_ID_FIELD_NUMBER: _ClassVar[int]
     WORKER_ID_FIELD_NUMBER: _ClassVar[int]
     ROUTE_COMPLETION_FIELD_NUMBER: _ClassVar[int]
@@ -54,6 +54,7 @@ class EpisodeResult(_message.Message):
     MODEL_VERSION_FIELD_NUMBER: _ClassVar[int]
     DATASET_VERSION_FIELD_NUMBER: _ClassVar[int]
     SIMULATOR_BACKEND_FIELD_NUMBER: _ClassVar[int]
+    RECEIVE_COUNT_FIELD_NUMBER: _ClassVar[int]
     episode_id: str
     worker_id: str
     route_completion: float
@@ -70,7 +71,8 @@ class EpisodeResult(_message.Message):
     model_version: str
     dataset_version: str
     simulator_backend: str
-    def __init__(self, episode_id: _Optional[str] = ..., worker_id: _Optional[str] = ..., route_completion: _Optional[float] = ..., infraction_penalty: _Optional[float] = ..., driving_score: _Optional[float] = ..., infractions: _Optional[_Iterable[_Union[InfractionCount, _Mapping]]] = ..., distance_travelled_m: _Optional[float] = ..., route_length_m: _Optional[float] = ..., frames: _Optional[int] = ..., duration_seconds: _Optional[float] = ..., mean_fps: _Optional[float] = ..., status: _Optional[str] = ..., termination_reason: _Optional[str] = ..., model_version: _Optional[str] = ..., dataset_version: _Optional[str] = ..., simulator_backend: _Optional[str] = ...) -> None: ...
+    receive_count: int
+    def __init__(self, episode_id: _Optional[str] = ..., worker_id: _Optional[str] = ..., route_completion: _Optional[float] = ..., infraction_penalty: _Optional[float] = ..., driving_score: _Optional[float] = ..., infractions: _Optional[_Iterable[_Union[InfractionCount, _Mapping]]] = ..., distance_travelled_m: _Optional[float] = ..., route_length_m: _Optional[float] = ..., frames: _Optional[int] = ..., duration_seconds: _Optional[float] = ..., mean_fps: _Optional[float] = ..., status: _Optional[str] = ..., termination_reason: _Optional[str] = ..., model_version: _Optional[str] = ..., dataset_version: _Optional[str] = ..., simulator_backend: _Optional[str] = ..., receive_count: _Optional[int] = ...) -> None: ...
 
 class RegisterRequest(_message.Message):
     __slots__ = ("worker_id", "hostname", "simulator_backend", "carla_port")
@@ -137,6 +139,22 @@ class RunStatusRequest(_message.Message):
     RUN_ID_FIELD_NUMBER: _ClassVar[int]
     run_id: str
     def __init__(self, run_id: _Optional[str] = ...) -> None: ...
+
+class RunResultsRequest(_message.Message):
+    __slots__ = ("run_id",)
+    RUN_ID_FIELD_NUMBER: _ClassVar[int]
+    run_id: str
+    def __init__(self, run_id: _Optional[str] = ...) -> None: ...
+
+class RunResultsResponse(_message.Message):
+    __slots__ = ("run_id", "results", "duplicate_submissions")
+    RUN_ID_FIELD_NUMBER: _ClassVar[int]
+    RESULTS_FIELD_NUMBER: _ClassVar[int]
+    DUPLICATE_SUBMISSIONS_FIELD_NUMBER: _ClassVar[int]
+    run_id: str
+    results: _containers.RepeatedCompositeFieldContainer[EpisodeResult]
+    duplicate_submissions: int
+    def __init__(self, run_id: _Optional[str] = ..., results: _Optional[_Iterable[_Union[EpisodeResult, _Mapping]]] = ..., duplicate_submissions: _Optional[int] = ...) -> None: ...
 
 class WorkerStatus(_message.Message):
     __slots__ = ("worker_id", "current_episode_id", "episode_progress", "episodes_completed", "seconds_since_heartbeat", "healthy")
