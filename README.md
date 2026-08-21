@@ -56,9 +56,19 @@ per km) — the car drives through what it cannot see.
 **4. Even so, perception is not the binding constraint.** Under the
 pre-registered decision rule,
 [the baseline controller's own 74.8-point shortfall from a perfect score exceeds perception's 16.34](results/ablation/carla_report.json "claim:prose") —
-the PurePursuit controller is the bottleneck. That measurement is what makes
-the next phase (a learned policy trained by DAgger) an attack on the right
-problem rather than a tool demo.
+the PurePursuit controller is the bottleneck. The planned next phase — a
+learned policy trained by DAgger — was then held to a second pre-registered
+gate, and the gate fired: its best available teacher, CARLA's own behaviour
+agent (**not project work**), scores
+[31.33](results/reference/carla_report.json "claim:summary.driving_score")
+on the identical suite, clearing the PurePursuit floor
+([25.2](results/reference/carla_report.json "claim:floor_gate.floor_driving_score"))
+by only [6.13](results/reference/carla_report.json "claim:floor_gate.margin")
+points against a required
+[10.0](results/reference/carla_report.json "claim:floor_gate.required_margin").
+Training was **stopped by that rule** rather than run to imitate a teacher
+barely better than the floor — the gates in this project are real decision
+rules, not decoration.
 
 ## Results
 
@@ -237,9 +247,11 @@ Stated here because honesty is the feature, not the disclaimer:
 - **The detector in CARLA is out-of-domain.**
   [It was trained on real KITTI imagery and driven on synthetic scenes](results/ablation/carla_report.json "claim:prose");
   the ablation quantifies the cost rather than hiding it.
-- **[No learned policy has been trained yet](pathfinder/dagger.py "claim:prose").**
+- **[No learned policy has been trained, and none will be under the current plan](pathfinder/dagger.py "claim:prose").**
   The DAgger loop, checkpointing, and scored comparison are proven CARLA-free
-  with untrained weights; training awaits a GPU sitting (issue #25).
+  with untrained weights and kept as pipeline machinery; training was stopped
+  when its pre-registered teacher-quality gate returned stop-and-reassess
+  (issues #16, #11).
 - **`person_sitting` is structurally unmeasurable** on this split (one
   validation drive), as covered under the results table.
 
