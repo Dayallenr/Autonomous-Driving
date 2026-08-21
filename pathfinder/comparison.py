@@ -161,15 +161,29 @@ def _validate(specs: list[EpisodeSpec], arms: list[ComparisonArm]) -> None:
                     "missing column is an omission, not a fact"
                 )
             continue
-        declared = getattr(arm.policy, "NAME", arm.policy_name)
+        # No forgiving fallbacks here: an absent attribute must fail the
+        # check, or an arm could claim any name or version simply by holding
+        # a Policy that declares nothing.
+        declared = getattr(arm.policy, "NAME", None)
         if declared != arm.policy_name:
             raise ValueError(
                 f"the {arm.role} arm claims policy {arm.policy_name!r} but its "
                 f"Policy declares {declared!r}; a mislabelled column poisons "
                 "the whole comparison"
             )
-        held_version = getattr(arm.policy, "model_version", arm.model_version)
-        if held_version != arm.model_version:
+        held_version = getattr(arm.policy, "model_version", None)
+        if held_version is None:
+            # A Policy without versioned weights is labelled by its registry
+            # name (the ``result_label`` convention); any richer claim would
+            # attribute the scores to weights that do not exist.
+            if arm.model_version != arm.policy_name:
+                raise ValueError(
+                    f"the {arm.role} arm claims weights version "
+                    f"{arm.model_version!r} but its Policy carries no "
+                    "model_version; a Policy without versioned weights is "
+                    "labelled by its registry name"
+                )
+        elif held_version != arm.model_version:
             raise ValueError(
                 f"the {arm.role} arm claims weights version "
                 f"{arm.model_version!r} but its Policy carries "

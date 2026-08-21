@@ -9,12 +9,15 @@ has happened.
 from __future__ import annotations
 
 import pytest
-import torch
 
 
 @pytest.fixture(scope="session")
 def cil_checkpoint(tmp_path_factory):
     """An untrained control-output CIL checkpoint in the DAgger CLI's format."""
+    # Imported inside the fixture so collecting the suite stays torch-free —
+    # the same isolation the registry itself keeps.
+    import torch
+
     from pathfinder.planning.cil_model import CILModel
 
     torch.manual_seed(0)

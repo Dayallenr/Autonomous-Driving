@@ -15,14 +15,7 @@ import json
 import pytest
 
 import pathfinder.comparison_writeup as writeup
-from pathfinder.comparison import (
-    ROLE_FLOOR,
-    ROLE_REFERENCE,
-    ROLE_STUDENT,
-    STUDENT_OBSERVATION_BOUNDARY,
-    ComparisonArm,
-    run_comparison,
-)
+from pathfinder.comparison import STUDENT_OBSERVATION_BOUNDARY, run_comparison
 from pathfinder.comparison_writeup import render_writeup
 from pathfinder.orchestration import build_episode_specs
 from pathfinder.policies import (
@@ -31,52 +24,10 @@ from pathfinder.policies import (
     CILStudentPolicy,
     build_policy,
 )
-from pathfinder.runner import ControlOutput, PurePursuitPolicy
 from pathfinder.sim.kinematic import KinematicSimulator
+from tests.support import make_comparison_arms as _arms
 
 REFERENCE = CarlaBehaviorAgentPolicy.NAME
-
-
-class StubReferencePolicy:
-    NAME = REFERENCE
-
-    def plan(self, state) -> ControlOutput:
-        return ControlOutput(throttle=0.3, steer=0.0, brake=0.0, latency_ms=0.1)
-
-
-def _arms(student, *, reference_skip: str = ""):
-    reference = (
-        ComparisonArm(
-            role=ROLE_REFERENCE,
-            policy_name=REFERENCE,
-            model_version=REFERENCE,
-            policy=None,
-            skip_reason=reference_skip,
-        )
-        if reference_skip
-        else ComparisonArm(
-            role=ROLE_REFERENCE,
-            policy_name=REFERENCE,
-            model_version=REFERENCE,
-            policy=StubReferencePolicy(),
-        )
-    )
-    return [
-        ComparisonArm(
-            role=ROLE_FLOOR,
-            policy_name=PURE_PURSUIT,
-            model_version=PURE_PURSUIT,
-            policy=PurePursuitPolicy(),
-        ),
-        ComparisonArm(
-            role=ROLE_STUDENT,
-            policy_name=CILStudentPolicy.NAME,
-            model_version=student.model_version,
-            policy=student,
-            weights=str(student.weights_path),
-        ),
-        reference,
-    ]
 
 
 @pytest.fixture(scope="module")

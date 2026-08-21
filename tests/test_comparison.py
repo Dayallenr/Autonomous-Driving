@@ -35,18 +35,9 @@ from pathfinder.policies import (
 )
 from pathfinder.runner import ControlOutput, PurePursuitPolicy
 from pathfinder.sim.kinematic import KinematicSimulator
+from tests.support import StubReferencePolicy, make_comparison_arms
 
 REFERENCE = CarlaBehaviorAgentPolicy.NAME
-
-
-class StubReferencePolicy:
-    """Drives blind but declares the behaviour agent's registry name, letting
-    the reference column run on a machine with no CARLA."""
-
-    NAME = REFERENCE
-
-    def plan(self, state) -> ControlOutput:
-        return ControlOutput(throttle=0.3, steer=0.0, brake=0.0, latency_ms=0.1)
 
 
 class ExplodingPolicy:
@@ -67,39 +58,7 @@ def tiny_specs(count: int = 2):
     )
 
 
-def three_arms(student, *, reference_policy=None, reference_skip: str = ""):
-    reference = (
-        ComparisonArm(
-            role=ROLE_REFERENCE,
-            policy_name=REFERENCE,
-            model_version=REFERENCE,
-            policy=None,
-            skip_reason=reference_skip,
-        )
-        if reference_policy is None and reference_skip
-        else ComparisonArm(
-            role=ROLE_REFERENCE,
-            policy_name=REFERENCE,
-            model_version=REFERENCE,
-            policy=reference_policy or StubReferencePolicy(),
-        )
-    )
-    return [
-        ComparisonArm(
-            role=ROLE_FLOOR,
-            policy_name=PURE_PURSUIT,
-            model_version=PURE_PURSUIT,
-            policy=PurePursuitPolicy(),
-        ),
-        ComparisonArm(
-            role=ROLE_STUDENT,
-            policy_name=CILStudentPolicy.NAME,
-            model_version=student.model_version,
-            policy=student,
-            weights=str(student.weights_path),
-        ),
-        reference,
-    ]
+three_arms = make_comparison_arms
 
 
 def run(student, **kwargs):
@@ -250,6 +209,36 @@ def test_an_arm_cannot_claim_a_weights_version_it_does_not_hold(student):
         run(student, arms=arms)
 
 
+def test_a_versionless_policy_cannot_claim_a_weights_version(student):
+    """PurePursuitPolicy declares no model_version; without an explicit
+    absent-attribute rule, any claimed version would validate vacuously."""
+    arms = three_arms(student)
+    arms[0] = ComparisonArm(
+        role=ROLE_FLOOR,
+        policy_name=PURE_PURSUIT,
+        model_version="cil_student@deadbeef0000",
+        policy=PurePursuitPolicy(),
+    )
+    with pytest.raises(ValueError, match="version"):
+        run(student, arms=arms)
+
+
+def test_a_policy_that_declares_no_name_is_refused(student):
+    class NamelessPolicy:
+        def plan(self, state):
+            raise AssertionError("never reached")
+
+    arms = three_arms(student)
+    arms[2] = ComparisonArm(
+        role=ROLE_REFERENCE,
+        policy_name=REFERENCE,
+        model_version=REFERENCE,
+        policy=NamelessPolicy(),
+    )
+    with pytest.raises(ValueError, match="declares"):
+        run(student, arms=arms)
+
+
 def test_two_arms_cannot_share_a_result_label(student):
     arms = three_arms(student)
     arms[2] = ComparisonArm(
@@ -304,9 +293,8 @@ def test_each_finished_episode_is_checkpointed_in_run_order(student):
 def test_the_default_suite_is_the_perception_ablations_exact_suite():
     """The whole point of sharing the suite is that the two artifacts' numbers
     are comparable; the pin is against the real CARLA ablation artifact."""
-    recorded = json.loads(
-        (Path("results/ablation/carla_report.json")).read_text(encoding="utf-8")
-    )["episodes"]
+    artifact = Path(__file__).resolve().parents[1] / "results/ablation/carla_report.json"
+    recorded = json.loads(artifact.read_text(encoding="utf-8"))["episodes"]
     specs = build_episode_specs(**comparison.DEFAULT_SUITE)
     assert [spec.to_dict() for spec in specs] == recorded
 
