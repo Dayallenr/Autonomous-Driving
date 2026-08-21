@@ -21,6 +21,11 @@ destroys that.
 **Corollary: never report a number you have not personally seen produced.** If
 results exist only on another machine or in a chat message, they do not exist.
 
+**Quoting a number in a document?** Use the citation convention in
+`docs/CLAIMS.md` — a Markdown link naming the artifact and JSON field path —
+and the claim checker (`pathfinder/claims.py`, run by
+`tests/test_claims_checker.py` in the ordinary suite) verifies it in CI.
+
 ---
 
 ## Ground rules
@@ -215,9 +220,9 @@ that a driven episode only ever surfaces commands its own route planned.
 | 7 Terraform / LocalStack / kind | **Written, never applied** — `terraform/` passes `fmt -check`, `init -backend=false`, `validate`, and `checkov` in CI; provisions EKS, ECR, SQS+DLQ, S3, **Kinesis**, KMS, IRSA, GitHub OIDC. `k8s/` carries kind manifests and an `eks/` overlay. Nothing has been applied to real AWS |
 | 8 CI/CD | **Done** — `.github/workflows/ci.yml` (ruff, pytest, hadolint, Docker build, trivy, compose validate, terraform validate + checkov) and `deploy.yml` (manual `workflow_dispatch` only) |
 | 9 README + demo | Not started; current README describes the old project |
-| 10 Claim-to-artifact mapping | Deferred by user request |
+| 10 Claim-to-artifact mapping | **In progress** — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table (#24) and README opt-in (#23) are next |
 
-379 tests pass on the Mac; `ruff check` clean.
+390 tests pass on the Mac; `ruff check` clean.
 
 ---
 
@@ -307,12 +312,17 @@ pathfinder/
   ablation_writeup.py — renders a report JSON into its Markdown write-up
               (scope banner, boundary sentence, infraction breakdown,
               binding-constraint verdict); called by the ablation CLI
+  claims.py — the claim checker (#19): parses the citation convention of
+              docs/CLAIMS.md out of opted-in documents and verifies every
+              quoted number against its artifact's JSON field; enforced by
+              tests/test_claims_checker.py, coverage CLI via
+              `python -m pathfinder.claims`
 scripts/      prepare_kitti.py · train_detector.py · eval_detector.py
               plot_data_report.py · probe_carla.py · generate_protos.py
               bench_rpc_latency.py · run_worker.py · enqueue_episodes.py
               archive_telemetry.py
-docs/         DATA.md · SETUP_WINDOWS.md · adr/ (0001 modular, 0002
-              Policy naming) · agents/
+docs/         DATA.md · SETUP_WINDOWS.md · CLAIMS.md (citation convention)
+              · adr/ (0001 modular, 0002 Policy naming) · agents/
 terraform/    EKS · ECR · SQS+DLQ · S3 · Kinesis · KMS · IRSA · OIDC
               (validated, never applied)
 k8s/          kind manifests + eks/ overlay
