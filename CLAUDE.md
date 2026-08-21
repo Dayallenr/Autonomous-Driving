@@ -194,8 +194,12 @@ stop-and-reassess (2026-08-21).** Over the ablation's exact suite (10/10
 episodes, 0 failures): driving score 31.33, route completion 0.368,
 infraction penalty 0.896 — margin over the privileged-PurePursuit floor
 (25.2) is **6.13 < the pre-registered 10.0**, so #16's gate fired
-**stop-and-reassess** and no DAgger training happens until #11's
-reassessment resolves. Two diagnostic facts for that reassessment: the
+**stop-and-reassess**. The reassessment resolved the same day: **the user
+decided to stop Phase 3 training entirely** (#11, closed) — the
+DAgger/comparison machinery stays as proven pipeline work, and no learned
+policy will be trained under the current plan. Do not propose restarting
+training without new evidence that would move the gate. Two diagnostic
+facts recorded from the run: the
 teacher shares the floor's dominant failure (`agent_blocked` ended 6/10
 episodes; its edge is fewer collisions, and it completes *less* route than
 the floor, 0.368 vs 0.396), and both arms are truncation-compressed (4/10
@@ -234,7 +238,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 1 KITTI data pipeline | **Done** — sequence-disjoint split, reproducible on Mac + Windows |
 | 2 Perception | **Done** — YOLOv8m trained, evaluated, `results/perception/yolov8m/report.json` |
 | — CARLA backend rewrite | **Validated against a live server** (2026-08-20) — `scripts/validate_carla_backend.py` passes every issue #5 criterion and writes `results/carla/backend_validation.json`. Three real bugs were found and fixed by running it; see "Established findings". The ego completes **47% of a 351 m Town05 route** before `agent_blocked`, which is a driving-quality ceiling of `PurePursuitPolicy` in CARLA, **not** a backend defect — no learned policy has driven this backend yet |
-| 3 CIL Policy + DAgger | **In progress** — the DAgger loop takes any `SimulatorBackend` and any expert `Policy` (#15; kinematic + PurePursuit stay the defaults, an injected simulator is caller-owned and not closed by the loop). The CLI exists (#20): `python -m pathfinder.dagger` checkpoints every iteration (weights + optimizer + report row + samples), auto-resumes a killed run losing at most one iteration (bit-identical to an uninterrupted run — randomness derives per-iteration from the seed), and lands report JSON + generated write-up together; `--smoke` is a minutes-long CPU loop check whose output self-labels as never-a-result against the documented `REAL_RUN_BAR` (carla + ImageNet init + ≥20k frames + ≥20 total epochs). The scoring side is done (#21, 2026-08-20): the student is registered as `cil_student` (explicit weights path required, eval mode, pinned device, `model_version` = `cil_student@<sha256[:12]>` of the checkpoint bytes), and `python -m pathfinder.comparison --weights <ckpt>` scores floor / student / reference ceiling over the ablation's exact seeded suite, writing report JSON + write-up together; arms cannot claim a Policy or weights version they do not hold, and on non-CARLA backends the behaviour-agent column is recorded as skipped with the reason in the artifact. Mechanism proven CARLA-free with untrained weights. The #16 reference baseline ran live (2026-08-21): ceiling 31.33, margin over the floor 6.13 < 10 → **gate verdict `stop-and-reassess`, so #25 training is paused pending the reassessment on #11**. Nothing has been trained |
+| 3 CIL Policy + DAgger | **In progress** — the DAgger loop takes any `SimulatorBackend` and any expert `Policy` (#15; kinematic + PurePursuit stay the defaults, an injected simulator is caller-owned and not closed by the loop). The CLI exists (#20): `python -m pathfinder.dagger` checkpoints every iteration (weights + optimizer + report row + samples), auto-resumes a killed run losing at most one iteration (bit-identical to an uninterrupted run — randomness derives per-iteration from the seed), and lands report JSON + generated write-up together; `--smoke` is a minutes-long CPU loop check whose output self-labels as never-a-result against the documented `REAL_RUN_BAR` (carla + ImageNet init + ≥20k frames + ≥20 total epochs). The scoring side is done (#21, 2026-08-20): the student is registered as `cil_student` (explicit weights path required, eval mode, pinned device, `model_version` = `cil_student@<sha256[:12]>` of the checkpoint bytes), and `python -m pathfinder.comparison --weights <ckpt>` scores floor / student / reference ceiling over the ablation's exact seeded suite, writing report JSON + write-up together; arms cannot claim a Policy or weights version they do not hold, and on non-CARLA backends the behaviour-agent column is recorded as skipped with the reason in the artifact. Mechanism proven CARLA-free with untrained weights. The #16 reference baseline ran live (2026-08-21): ceiling 31.33, margin over the floor 6.13 < 10 → gate verdict `stop-and-reassess`, and the user **stopped Phase 3 training by decision** (2026-08-21; #11 and #25 closed). **Phase closed: machinery kept as pipeline work, nothing trained, nothing will be under the current plan** |
 | 4 GT-vs-YOLO ablation | **Done** (2026-08-20) — real CARLA numbers: privileged 25.2 vs detector 8.86, perception costs 16.34 points; see "Established findings". `results/ablation/carla_report.{json,md}`; #1 and #10 closed with the numbers quoted |
 | 5 Distributed benchmark (SQS, telemetry, Parquet) | **Report + chaos-kill e2e done** (#17, 2026-08-21) — the `distributed_run` report kind collects coordinator results over gRPC (new `GetRunResults` RPC), counts redeliveries from each result's `receive_count` (SQS's `ApproximateReceiveCount`, observed by the completing worker — works identically on local and SQS backends), and lands report JSON + write-up via `reporting.ReportArtifact`. `tests/test_distributed_e2e.py` kills a worker mid-Episode (BaseException past `run_episode`'s `except Exception` — a plain Exception would score-and-acknowledge, the wrong path), proves visibility-timeout redelivery to the survivor, Parquet row counts matching the report, DLQ empty, provenance on every row. Still needs real CARLA episodes and real AWS SQS (#22, #26, #12) |
 | 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
@@ -249,35 +253,24 @@ that a driven episode only ever surfaces commands its own route planned.
 
 ## Immediate next step
 
-**Phase 3 training is gated: the #16 verdict was `stop-and-reassess`, and
-the reassessment (tracked on #11) is a user decision.** The reference
-ceiling (31.33) clears the floor (25.2) by only 6.13 points against the
-pre-registered 10.0, so the GPU/DAgger sitting (#25) does not happen as
-planned. The options on the table (#11 comment, 2026-08-21): (1) test the
-truncation hypothesis — re-run *both* floor and reference on a
-longer-horizon suite (higher `max_steps`, same seeds) and recompute the
-gate on the comparable pair; (2) try `--behavior aggressive` in the same
-sitting; (3) scope Phase 3 down to a mechanism demonstration against the
-PurePursuit expert, ceiling stated plainly; (4) stop Phase 3 training,
-keep the machinery as pipeline work. Options 1+2 are one short Windows
-sitting. **Do not start training until the user decides.**
+**Phase 3 is closed by decision (2026-08-21): training stopped.** The #16
+gate returned `stop-and-reassess` (ceiling 31.33 vs floor 25.2, margin
+6.13 < 10.0) and the user chose to stop rather than reassess further; #11
+and #25 are closed. The DAgger loop, `cil_student`, and the three-column
+comparison remain in the repo as proven pipeline machinery — every document
+that mentions them says training was stopped by the pre-registered gate,
+and that framing (gates that actually fire) is part of the project's story.
+Do not propose restarting training without new evidence that would move
+the gate.
 
-Meanwhile the agent-doable front is Phase 5: #22 (LocalStack rehearsal of
-the distributed runbook, unblocked by #17) and #35 (CLI flag
-consolidation). Known limits of #21 to keep in view: the real three-column
-CARLA run has not happened (the kinematic run records the behaviour-agent
-column as skipped), and the phase-5 worker paths cannot pass `weights=`
-from their CLIs yet — `scripts/run_worker.py`'s library entry
-(`run_worker(policy=...)`) now takes an injected Policy (#17's seam), but
-neither its CLI nor `EpisodeWorker` does, so `cil_student` is not yet
-drivable through the distributed benchmark.
-
-The ablation's finding still frames everything: PurePursuit is the measured
-binding constraint (its own 74.80-point shortfall exceeds perception's
-16.34), and now the reference run shows even CARLA's own agent only reaches
-31.33 on this suite — the suite's 1500-step cap and blocking dominate both.
-Wherever the CIL policy is eventually compared, state the ceiling and the
-cap plainly.
+**The open front is Phase 5 — making the distributed benchmark real:**
+#22 (LocalStack rehearsal of the runbook, unblocked by #17), #35 (CLI flag
+consolidation, good to land before #22 freezes the runbook commands), then
+#18 (budget alarm + real SQS apply — needs the user's `aws configure` and a
+checkpoint first) and #26 (the live run). #27 (demo clip) and the phase
+tickets #12/#13/#14 remain open. With training stopped, the eventual real
+distributed run scores `pure_pursuit` on kinematic workers — the honest
+labelling machinery for that already exists.
 
 Environment note: the CARLA 0.9.16 wheels are **cp312 only**, so `.venv` is
 Python 3.12. `torch`/`torchvision`/`ultralytics` are deliberately *not* in it —
