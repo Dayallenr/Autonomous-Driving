@@ -222,7 +222,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | **In progress** — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table (#24) and README opt-in (#23) are next |
 
-390 tests pass on the Mac; `ruff check` clean.
+393 tests pass on the Mac; `ruff check` clean.
 
 ---
 

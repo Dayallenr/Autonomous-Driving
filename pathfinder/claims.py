@@ -14,21 +14,36 @@ generators use. The second kind is prose-audited: the checker verifies the
 evidence path exists and counts the claim, but checks no number.
 
 Link targets resolve relative to the containing document, exactly as Markdown
-renders them, so a citation is always also a working link.
+renders them, so a citation is always also a working link. Citations inside
+fenced code blocks are inert (a convention page must be able to show broken
+examples), and a link that mentions ``claim:`` without matching the syntax is
+a failure, never a silent skip.
 """
 from __future__ import annotations
 
+import argparse
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-__all__ = ["Claim", "DocumentReport", "RepoReport", "check_document", "check_repo"]
+__all__ = [
+    "Claim",
+    "DocumentReport",
+    "RepoReport",
+    "check_document",
+    "check_repo",
+    "find_claims",
+]
 
 CHECKED_MARKER = "<!-- claims: checked -->"
 PROSE_FIELD = "prose"
 
-# An inline Markdown link with a quoted title: [text](target "title").
-_LINK = re.compile(r'\[([^\]]+)\]\(\s*([^()\s"]+)\s+"claim:([^"]+)"\s*\)')
+# A citation: an inline Markdown link whose title is "claim:<field.path>".
+_CLAIM_LINK = re.compile(r'\[([^\]]+)\]\(\s*([^()\s"]+)\s+"claim:([^"]+)"\s*\)')
+# Any inline Markdown link at all — used to catch citations that were
+# attempted (they mention claim:) but do not match the syntax above.
+_ANY_LINK = re.compile(r"\[[^\]]*\]\([^)]*\)")
 
 
 @dataclass(frozen=True)
@@ -39,7 +54,11 @@ class Claim:
     line: int
     quoted: str
     artifact: str
-    field_path: str  # PROSE_FIELD marks a prose-audited claim
+    field_path: str
+
+    @property
+    def is_prose(self) -> bool:
+        return self.field_path == PROSE_FIELD
 
 
 @dataclass
@@ -52,11 +71,11 @@ class DocumentReport:
 
     @property
     def machine_checked(self) -> int:
-        return sum(1 for claim in self.claims if claim.field_path != PROSE_FIELD)
+        return sum(1 for claim in self.claims if not claim.is_prose)
 
     @property
     def prose_audited(self) -> int:
-        return sum(1 for claim in self.claims if claim.field_path == PROSE_FIELD)
+        return sum(1 for claim in self.claims if claim.is_prose)
 
 
 @dataclass
@@ -96,9 +115,24 @@ def check_repo(root: Path) -> RepoReport:
     )
 
 
+def _content_lines(text: str) -> list[tuple[int, str]]:
+    """The document's lines outside fenced code blocks, with line numbers."""
+    lines = []
+    in_fence = False
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+        elif not in_fence:
+            lines.append((number, line))
+    return lines
+
+
 def find_claims(document: Path) -> list[Claim]:
     """Parse every cited claim out of one document, in order."""
-    text = document.read_text(encoding="utf-8")
+    return _claims_in(document.read_text(encoding="utf-8"), document)
+
+
+def _claims_in(text: str, document: Path) -> list[Claim]:
     return [
         Claim(
             document=document,
@@ -107,20 +141,40 @@ def find_claims(document: Path) -> list[Claim]:
             artifact=match.group(2),
             field_path=match.group(3),
         )
-        for number, line in enumerate(text.splitlines(), start=1)
-        for match in _LINK.finditer(line)
+        for number, line in _content_lines(text)
+        for match in _CLAIM_LINK.finditer(line)
     ]
 
 
 def check_document(document: Path) -> DocumentReport:
     """Check every cited claim in one document against its artifacts."""
+    text = document.read_text(encoding="utf-8")
     report = DocumentReport(document=document)
-    report.claims = find_claims(document)
+    report.claims = _claims_in(text, document)
+    report.failures = _malformed_citations(text, document)
     for claim in report.claims:
         failure = _check_claim(claim)
         if failure is not None:
             report.failures.append(failure)
     return report
+
+
+def _malformed_citations(text: str, document: Path) -> list[str]:
+    """Links that attempted the citation syntax but got it wrong.
+
+    A typo'd citation must fail loudly — silently treating it as an ordinary
+    link would leave the number it quotes unchecked under a green build.
+    """
+    failures = []
+    for number, line in _content_lines(text):
+        citation_starts = {match.start() for match in _CLAIM_LINK.finditer(line)}
+        for match in _ANY_LINK.finditer(line):
+            if match.start() not in citation_starts and "claim:" in match.group(0):
+                failures.append(
+                    f"{document.name}:{number}: malformed citation {match.group(0)!r} — "
+                    'expected [number](artifact "claim:field.path")'
+                )
+    return failures
 
 
 def _check_claim(claim: Claim) -> str | None:
@@ -130,10 +184,8 @@ def _check_claim(claim: Claim) -> str | None:
             f"{claim.document.name}:{claim.line}: claim [{claim.quoted}] cites "
             f"missing artifact {claim.artifact}"
         )
-    if claim.field_path == PROSE_FIELD:
+    if claim.is_prose:
         return None
-    import json
-
     data = json.loads(artifact.read_text(encoding="utf-8"))
     try:
         value = _resolve(data, claim.field_path)
@@ -163,14 +215,16 @@ def _resolve(data: object, field_path: str) -> object:
 
 
 def _quoted_matches(quoted: str, value: object) -> bool:
+    # bool is excluded explicitly: True is an int to isinstance, but a JSON
+    # boolean is never an honest match for a quoted number.
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
     decimals = len(quoted.partition(".")[2])
-    return isinstance(value, (int, float)) and f"{value:.{decimals}f}" == quoted
+    return f"{value:.{decimals}f}" == quoted
 
 
 def main(argv: list[str] | None = None) -> int:
     """Check every opted-in document and print the coverage counts."""
-    import argparse
-
     parser = argparse.ArgumentParser(
         description="Check every opted-in document's cited claims against their artifacts."
     )

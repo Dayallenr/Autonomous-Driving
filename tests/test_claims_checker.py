@@ -9,11 +9,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pathfinder.claims import check_document, check_repo
+from pathfinder.claims import CHECKED_MARKER, check_document, check_repo
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-CHECKED_MARKER = "<!-- claims: checked -->"
 
 
 def write_report(path, payload) -> None:
@@ -148,6 +146,56 @@ def test_field_path_indexes_into_lists(tmp_path):
 
     assert len(result.failures) == 1
     assert "episodes.2.seed" in result.failures[0]
+
+
+def test_fenced_code_blocks_are_not_claims(tmp_path):
+    # docs/CLAIMS.md shows the syntax inside ``` fences; those examples must
+    # be inert, or the convention page could never show a counter-example.
+    write_report(tmp_path / "report.json", {"score": 1.5})
+    doc = tmp_path / "doc.md"
+    doc.write_text(
+        f"{CHECKED_MARKER}\n"
+        "```\n"
+        '[9.9](report.json "claim:score")\n'
+        '[16.34](gone.json claim:broken.example)\n'
+        "```\n"
+        '[1.5](report.json "claim:score")\n',
+        encoding="utf-8",
+    )
+
+    result = check_document(doc)
+
+    assert result.failures == []
+    assert result.machine_checked == 1
+
+
+def test_malformed_citation_fails_rather_than_silently_skipping(tmp_path):
+    # A typo'd citation must not quietly become a non-claim with a green
+    # build — that would defeat the checker's whole purpose.
+    write_report(tmp_path / "report.json", {"difference": {"driving_score": 16.34}})
+    doc = tmp_path / "doc.md"
+    doc.write_text(
+        f"{CHECKED_MARKER}\n[16.34](report.json claim:difference.driving_score)\n",
+        encoding="utf-8",
+    )
+
+    result = check_document(doc)
+
+    assert result.machine_checked == 0
+    assert len(result.failures) == 1
+    assert "malformed" in result.failures[0]
+
+
+def test_boolean_field_never_matches_a_numeric_quote(tmp_path):
+    write_report(tmp_path / "report.json", {"applied": True})
+    doc = tmp_path / "doc.md"
+    doc.write_text(
+        f'{CHECKED_MARKER}\n[1](report.json "claim:applied")\n', encoding="utf-8"
+    )
+
+    result = check_document(doc)
+
+    assert len(result.failures) == 1
 
 
 def test_check_repo_only_checks_documents_that_opt_in(tmp_path):

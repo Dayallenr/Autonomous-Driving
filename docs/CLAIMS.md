@@ -23,6 +23,10 @@ Put this marker anywhere in the document (conventionally near the top):
 The checker scans the repo's root-level `*.md` files and everything under
 `docs/`; only documents carrying the marker are checked. Generated write-ups
 under `results/` are artifacts, not documents, and stay out of scope.
+Citations inside fenced code blocks are inert — that is how this page shows
+the syntax without the examples being live — and a link that mentions
+`claim:` without matching the syntax exactly is a checker failure, never a
+silent skip.
 
 ## Citing a number (machine-checked)
 
@@ -33,7 +37,8 @@ A numeric claim is an ordinary Markdown link:
 ```
 
 - **Link text** — the quoted number, exactly as displayed, nothing else.
-  Units and prose stay outside the link.
+  Units and prose stay outside the link, and thousands separators are not
+  supported — write `5978`, never `5,978`.
 - **Link target** — the artifact's path, relative to the containing document
   (like any Markdown link), so a citation always renders as a working link.
 - **Link title** — `claim:` followed by the dotted field path into the
