@@ -16,30 +16,22 @@ artifacts land together.
 """
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
+from pathfinder.reporting import (
+    NOT_PROJECT_WORK,
+    generated_from,
+    infraction_table,
+    regenerate_writeup_main,
+    scope_banner,
+    suite_section,
+)
 
 __all__ = ["render_writeup"]
-
-#: The sentence that travels with the behaviour agent wherever it appears,
-#: matching ``pathfinder/dagger_writeup.py``'s stance.
-_NOT_PROJECT_WORK = (
-    "CARLA's own behaviour agent — **not project work**. It reads the "
-    "simulator's world state directly and appears only as a reference upper "
-    "bound produced by the same routes, traffic, and scoring; nothing it "
-    "does may be presented as this project's driving."
-)
 
 _ROLE_TITLES = {
     "floor": "Floor",
     "student": "Student",
     "reference_ceiling": "Reference ceiling",
 }
-
-
-def _unique_in_order(values: list[str]) -> list[str]:
-    return list(dict.fromkeys(values))
 
 
 def _column_heading(arm: dict) -> str:
@@ -75,7 +67,7 @@ def _student_bullet(arm: dict, boundary: str) -> str:
 
 
 def _reference_bullet(arm: dict) -> str:
-    bullet = f"- **{_ROLE_TITLES['reference_ceiling']}** — `{arm['model_version']}`: {_NOT_PROJECT_WORK}"
+    bullet = f"- **{_ROLE_TITLES['reference_ceiling']}** — `{arm['model_version']}`: {NOT_PROJECT_WORK}"
     if arm.get("skipped"):
         bullet += f" It did not run in this suite: {arm['skip_reason']}."
     return bullet
@@ -111,25 +103,16 @@ def _results_table(arms: list[dict]) -> list[str]:
 
 
 def _infraction_table(arms: list[dict]) -> list[str]:
-    totals = {
-        arm["role"]: arm["summary"]["infraction_totals"]
-        for arm in arms
-        if not arm.get("skipped")
-    }
-    names = sorted({name for counts in totals.values() for name in counts})
-    if not names:
-        return ["No arm committed a scoreable or tracked infraction."]
-    lines = [
-        "| Infraction | " + " | ".join(_column_heading(arm) for arm in arms) + " |",
-        "|---|" + "---|" * len(arms),
-    ]
-    for name in names:
-        cells = [
-            "not run" if arm.get("skipped") else str(totals[arm["role"]].get(name, 0))
+    return infraction_table(
+        [
+            (
+                _column_heading(arm),
+                None if arm.get("skipped") else arm["summary"]["infraction_totals"],
+            )
             for arm in arms
-        ]
-        lines.append(f"| {name} | " + " | ".join(cells) + " |")
-    return lines
+        ],
+        empty_message="No arm committed a scoreable or tracked infraction.",
+    )
 
 
 def _per_episode_table(report: dict) -> list[str]:
@@ -176,21 +159,15 @@ def render_writeup(report: dict, *, source: str) -> str:
     """
     arms = report["arms"]
     by_role = {arm["role"]: arm for arm in arms}
-    specs = report["episodes"]
-    towns = _unique_in_order([spec["town"] for spec in specs])
-    weathers = _unique_in_order([spec["weather"] for spec in specs])
-    seeds = [spec["seed"] for spec in specs]
 
     lines = [
         f"# Policy comparison — {report['backend']} backend",
         "",
-        f"Generated {report['generated_at']} from [`{source}`]"
-        f"({Path(source).name}), which records every number below along with "
-        "the full episode specifications needed to re-run it. This file is "
-        "rendered from that artifact by `pathfinder/comparison_writeup.py`; "
-        "edit the generator, not this file.",
+        generated_from(
+            report, source=source, generator="pathfinder/comparison_writeup.py"
+        ),
         "",
-        f"> **Scope: {report['scope']}.** {report['scope_note']}",
+        scope_banner(report),
         "",
         "## The three columns",
         "",
@@ -202,12 +179,7 @@ def render_writeup(report: dict, *, source: str) -> str:
         _student_bullet(by_role["student"], report["student_observation_boundary"]),
         _reference_bullet(by_role["reference_ceiling"]),
         "",
-        "## Suite",
-        "",
-        f"- Episodes per column: {len(specs)}",
-        f"- Towns: {', '.join(towns)}",
-        f"- Weathers: {', '.join(weathers)}",
-        f"- Seeds: {min(seeds)}–{max(seeds)}",
+        *suite_section(report["episodes"], episodes_label="Episodes per column"),
         "",
         "## Results",
         "",
@@ -235,23 +207,12 @@ def render_writeup(report: dict, *, source: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Regenerate the Markdown write-up for a policy-comparison report."
+    return regenerate_writeup_main(
+        argv,
+        kind="policy_comparison",
+        render_writeup=render_writeup,
+        description="Regenerate the Markdown write-up for a policy-comparison report.",
     )
-    parser.add_argument(
-        "report", type=Path, help="path to a policy_comparison JSON report"
-    )
-    args = parser.parse_args(argv)
-
-    report = json.loads(args.report.read_text(encoding="utf-8"))
-    if report.get("kind") != "policy_comparison":
-        raise SystemExit(f"{args.report} is not a policy_comparison report")
-    output = args.report.with_suffix(".md")
-    # See the note in ablation.py: the rendered write-up is not ASCII, and
-    # write_text without an explicit encoding uses cp1252 on Windows.
-    output.write_text(render_writeup(report, source=str(args.report)), encoding="utf-8")
-    print(f"write-up written to {output}")
-    return 0
 
 
 if __name__ == "__main__":
