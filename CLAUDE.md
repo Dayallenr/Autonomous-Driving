@@ -218,14 +218,14 @@ that a driven episode only ever surfaces commands its own route planned.
 | — CARLA backend rewrite | **Validated against a live server** (2026-08-20) — `scripts/validate_carla_backend.py` passes every issue #5 criterion and writes `results/carla/backend_validation.json`. Three real bugs were found and fixed by running it; see "Established findings". The ego completes **47% of a 351 m Town05 route** before `agent_blocked`, which is a driving-quality ceiling of `PurePursuitPolicy` in CARLA, **not** a backend defect — no learned policy has driven this backend yet |
 | 3 CIL Policy + DAgger | **In progress** — the DAgger loop takes any `SimulatorBackend` and any expert `Policy` (#15; kinematic + PurePursuit stay the defaults, an injected simulator is caller-owned and not closed by the loop). The CLI exists (#20): `python -m pathfinder.dagger` checkpoints every iteration (weights + optimizer + report row + samples), auto-resumes a killed run losing at most one iteration (bit-identical to an uninterrupted run — randomness derives per-iteration from the seed), and lands report JSON + generated write-up together; `--smoke` is a minutes-long CPU loop check whose output self-labels as never-a-result against the documented `REAL_RUN_BAR` (carla + ImageNet init + ≥20k frames + ≥20 total epochs). The scoring side is done (#21, 2026-08-20): the student is registered as `cil_student` (explicit weights path required, eval mode, pinned device, `model_version` = `cil_student@<sha256[:12]>` of the checkpoint bytes), and `python -m pathfinder.comparison --weights <ckpt>` scores floor / student / reference ceiling over the ablation's exact seeded suite, writing report JSON + write-up together; arms cannot claim a Policy or weights version they do not hold, and on non-CARLA backends the behaviour-agent column is recorded as skipped with the reason in the artifact. Mechanism proven CARLA-free with untrained weights. Training itself not started — needs CARLA (#25, unblocked by #16) |
 | 4 GT-vs-YOLO ablation | **Done** (2026-08-20) — real CARLA numbers: privileged 25.2 vs detector 8.86, perception costs 16.34 points; see "Established findings". `results/ablation/carla_report.{json,md}`; #1 and #10 closed with the numbers quoted |
-| 5 Distributed benchmark (SQS, telemetry, Parquet) | Queue/telemetry/warehouse code exists and is tested; needs real CARLA episodes and real AWS SQS |
+| 5 Distributed benchmark (SQS, telemetry, Parquet) | **Report + chaos-kill e2e done** (#17, 2026-08-21) — the `distributed_run` report kind collects coordinator results over gRPC (new `GetRunResults` RPC), counts redeliveries from each result's `receive_count` (SQS's `ApproximateReceiveCount`, observed by the completing worker — works identically on local and SQS backends), and lands report JSON + write-up via `reporting.ReportArtifact`. `tests/test_distributed_e2e.py` kills a worker mid-Episode (BaseException past `run_episode`'s `except Exception` — a plain Exception would score-and-acknowledge, the wrong path), proves visibility-timeout redelivery to the survivor, Parquet row counts matching the report, DLQ empty, provenance on every row. Still needs real CARLA episodes and real AWS SQS (#22, #26, #12) |
 | 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
 | 7 Terraform / LocalStack / kind | **Written, never applied** — `terraform/` passes `fmt -check`, `init -backend=false`, `validate`, and `checkov` in CI; provisions EKS, ECR, SQS+DLQ, S3, **Kinesis**, KMS, IRSA, GitHub OIDC. `k8s/` carries kind manifests and an `eks/` overlay. Nothing has been applied to real AWS |
 | 8 CI/CD | **Done** — `.github/workflows/ci.yml` (ruff, pytest, hadolint, Docker build, trivy, compose validate, terraform validate + checkov) and `deploy.yml` (manual `workflow_dispatch` only) |
 | 9 README + demo | **README done** (#23, 2026-08-21) — findings-first rewrite, opted in to the claim checker (55 machine-checked + 16 prose-audited claims verified in CI), tool-honesty boundaries in the established phrasing, zero-GPU quickstart executed end-to-end on the Mac in a fresh Python 3.12 venv. The demo clip slot remains open (#27) and the README does not wait on it |
 | 10 Claim-to-artifact mapping | **In progress** — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table landed (#24, 2026-08-21): root `CLAIMS.md` is the claim-of-record — every established finding cited machine-checked, the boundary claims prose-audited, all passing in CI (`python -m pathfinder.claims` for the live counts). The README opted in with #23 (2026-08-21) |
 
-414 tests pass on the Mac; `ruff check` clean.
+429 tests pass on the Mac; `ruff check` clean.
 
 ---
 
@@ -243,8 +243,11 @@ over the ablation's recorded floor), so what remains is the user's short
 CARLA sitting. Nothing has been trained yet. Known
 limits of #21 to keep in view: the real three-column CARLA run has not
 happened (the kinematic run records the behaviour-agent column as skipped),
-and the phase-5 worker path (`EpisodeWorker`) cannot pass `weights=` yet, so
-`cil_student` is not yet drivable through the distributed benchmark.
+and the phase-5 worker paths cannot pass `weights=` from their CLIs yet —
+`scripts/run_worker.py`'s library entry (`run_worker(policy=...)`) now takes
+an injected Policy (#17's seam), but neither its CLI nor `EpisodeWorker`
+does, so `cil_student` is not yet drivable through the distributed
+benchmark.
 
 The ablation sharpened the baseline question: PurePursuit is now *measured*
 as the binding constraint on driving score (its own shortfall, 74.80 points,
@@ -315,6 +318,14 @@ pathfinder/
   ablation_writeup.py — renders a report JSON into its Markdown write-up
               (scope banner, boundary sentence, infraction breakdown,
               binding-constraint verdict); called by the ablation CLI
+  distributed_run.py — the Phase 5 run report (#17): collects coordinator
+              status/results over gRPC, queue statistics (redeliveries from
+              result receive_counts, DLQ), and warehouse totals into one
+              artifact; CLI mirrors archive_telemetry's flags and can drain
+              telemetry itself before reporting
+  distributed_writeup.py — renders a distributed_run report into Markdown
+              (scope banner, redelivery + DLQ sentences, per-row worker/
+              backend/Policy attribution, suite cross-check)
   reporting.py — the one home (#29) for what every report kind above shares:
               the scope rule (only CARLA earns driving-quality), ReportArtifact
               (partial checkpoints + report/write-up landing, utf-8 explicit),

@@ -44,7 +44,7 @@ from pathfinder.policies import (
     result_label,
 )
 from pathfinder.rpc.client import CoordinatorClient, WorkerHeartbeatState, episode_score_to_proto
-from pathfinder.runner import run_episode
+from pathfinder.runner import Policy, run_episode
 from pathfinder.sim.base import EpisodeSpec
 from pathfinder.sim.carla_backend import build_simulator
 
@@ -61,9 +61,12 @@ async def _drain_one(
     wait_seconds: float,
     model_version: str = "",
     telemetry_stream: TelemetryStream | None = None,
-) -> EpisodeScore | None:
-    """Receive and run at most one episode. Returns ``None`` if the queue had
-    nothing to offer within ``wait_seconds``.
+) -> tuple[EpisodeScore, int] | None:
+    """Receive and run at most one episode. Returns the score together with
+    the message's delivery count (above 1 means the queue redelivered it —
+    crash recovery actually firing — which the result carries to the
+    coordinator so the run report can count redeliveries). Returns ``None``
+    if the queue had nothing to offer within ``wait_seconds``.
 
     ``queue.receive``/``run_episode`` are both blocking calls (network I/O or
     CPU-bound simulation); running them via ``asyncio.to_thread`` keeps the
@@ -94,7 +97,7 @@ async def _drain_one(
         # Delete only after a result exists, so a crash mid-episode leaves the
         # message for another worker rather than silently losing the episode.
         queue.delete(message.receipt_handle)
-        return score
+        return score, message.receive_count
     finally:
         state.current_episode_id = ""
 
@@ -111,12 +114,19 @@ async def run_worker(
     receive_wait_seconds: float = 2.0,
     stop_event: asyncio.Event | None = None,
     telemetry_stream: TelemetryStream | None = None,
+    policy: Policy | None = None,
 ) -> list[EpisodeScore]:
     """Register, then loop episodes until the queue drains, the coordinator
     asks this worker to stop, or ``stop_event`` is set (e.g. by a SIGTERM
     handler — a Kubernetes scale-down sends this, and finishing the in-flight
     episode before exiting is strictly cheaper than losing it to redelivery).
-    Returns everything this worker completed."""
+    Returns everything this worker completed.
+
+    ``policy`` injects a caller-built Policy instead of building one from
+    ``policy_name`` — the same seam the DAgger loop exposes (#15), for tests
+    and for Policies whose construction needs more than a name. The caller
+    owns label honesty: ``policy_name``/``model_version`` still stamp every
+    result, so they must describe what the injected Policy actually is."""
     client = CoordinatorClient.connect(coordinator_address)
     results: list[EpisodeScore] = []
     state = WorkerHeartbeatState()
@@ -142,14 +152,15 @@ async def run_worker(
         # agent asked to drive the kinematic backend, say — raises here, before
         # a single message is taken off the queue, rather than turning every
         # Episode into a scored failure. Inside the try so teardown still runs.
-        policy = build_policy(policy_name, simulator=simulator)
+        if policy is None:
+            policy = build_policy(policy_name, simulator=simulator)
         while not client.should_stop and (stop_event is None or not stop_event.is_set()):
-            score = await _drain_one(
+            drained = await _drain_one(
                 queue, simulator, policy,
                 worker_id=worker_id, state=state, wait_seconds=receive_wait_seconds,
                 model_version=label, telemetry_stream=telemetry_stream,
             )
-            if score is None:
+            if drained is None:
                 # idle_timeout_seconds <= 0 means "never give up" — the shape
                 # a Kubernetes Deployment needs (a pod that exits looks like a
                 # crash to the controller, which just restarts it into another
@@ -167,6 +178,7 @@ async def run_worker(
                 continue
 
             idle_since = None
+            score, receive_count = drained
             results.append(score)
             state.episodes_completed += 1
             state.frames_completed += score.frames
@@ -179,6 +191,7 @@ async def run_worker(
                 worker_id=worker_id,
                 model_version=label,
                 simulator_backend=simulator_backend,
+                receive_count=receive_count,
             )
             submit_response = await client.submit_result(proto_result)
             if submit_response.duplicate:

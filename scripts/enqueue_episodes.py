@@ -31,6 +31,13 @@ def main() -> None:
     parser.add_argument("--queue-endpoint-url", type=str, default=None, help="For LocalStack")
     parser.add_argument("--queue-region", type=str, default="us-east-1")
     parser.add_argument("--route-length-m", type=float, default=400.0)
+    parser.add_argument(
+        "--suite-out", type=Path, default=None,
+        help="Also write the enqueued specs as a JSON manifest — the record "
+        "the run-report collector (python -m pathfinder.distributed_run "
+        "--suite) reads, so the report describes the suite that was actually "
+        "enqueued rather than a reconstruction from matching flags.",
+    )
     args = parser.parse_args()
 
     queue_url = args.queue_url
@@ -52,6 +59,16 @@ def main() -> None:
         queue.send(spec.to_dict())
 
     print(f"enqueued {len(specs)} episodes onto {queue_url or '(local, in-process)'}")
+
+    if args.suite_out is not None:
+        import json
+
+        args.suite_out.parent.mkdir(parents=True, exist_ok=True)
+        args.suite_out.write_text(
+            json.dumps([spec.to_dict() for spec in specs], indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(f"suite manifest written to {args.suite_out}")
 
 
 if __name__ == "__main__":

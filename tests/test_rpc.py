@@ -115,6 +115,45 @@ def test_submit_result_dedups_on_resubmit():
     asyncio.run(body())
 
 
+def test_run_results_returns_full_rows_with_provenance():
+    async def body():
+        server, service, port = await _start_server()
+        client = CoordinatorClient.connect(f"127.0.0.1:{port}")
+        try:
+            redelivered = episode_score_to_proto(
+                _sample_score("ep-0001"),
+                worker_id="worker-b",
+                model_version="pure_pursuit",
+                simulator_backend="kinematic",
+                receive_count=2,
+            )
+            fresh = episode_score_to_proto(
+                _sample_score("ep-0002"), worker_id="worker-a", simulator_backend="kinematic"
+            )
+            await client.submit_result(redelivered)
+            await client.submit_result(fresh)
+            # A resubmission must show up as a duplicate, not a third row.
+            await client.submit_result(fresh)
+
+            response = await client.get_run_results(service.run.run_id)
+            assert response.run_id == service.run.run_id
+            assert response.duplicate_submissions == 1
+            rows = {row.episode_id: row for row in response.results}
+            assert set(rows) == {"ep-0001", "ep-0002"}
+            assert rows["ep-0001"].worker_id == "worker-b"
+            assert rows["ep-0001"].model_version == "pure_pursuit"
+            assert rows["ep-0001"].simulator_backend == "kinematic"
+            # The redelivery observation survives the wire — this is what the
+            # distributed-run report counts redeliveries from.
+            assert rows["ep-0001"].receive_count == 2
+            assert rows["ep-0002"].receive_count == 1
+        finally:
+            await client.close()
+            await server.stop(None)
+
+    asyncio.run(body())
+
+
 def test_cooperative_stop_is_seen_on_next_heartbeat():
     async def body():
         server, service, port = await _start_server()

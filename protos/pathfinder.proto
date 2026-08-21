@@ -64,6 +64,12 @@ message EpisodeResult {
   // a CARLA score, and recording the backend is what stops the two being
   // silently averaged together.
   string simulator_backend = 16;
+  // How many times the queue had delivered this episode when the completing
+  // worker received it (SQS's ApproximateReceiveCount). Anything above 1 is a
+  // redelivery — the crash-recovery path actually firing — and carrying it on
+  // the result is what lets a run report count redeliveries without a
+  // backend-specific queue query.
+  int32 receive_count = 17;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,6 +123,23 @@ message RunStatusRequest {
   string run_id = 1;
 }
 
+message RunResultsRequest {
+  string run_id = 1;
+}
+
+// The full result rows, distinct from RunStatusResponse's aggregates: a
+// report collector needs every row with its provenance (worker, backend,
+// model version, receive count), and stuffing hundreds of rows into the
+// status message would make every dashboard poll pay for them.
+message RunResultsResponse {
+  string run_id = 1;
+  repeated EpisodeResult results = 2;
+  // Submissions that arrived for an episode_id already recorded — the
+  // at-least-once path where a slow worker finished after its message had
+  // been redelivered and completed by someone else.
+  int32 duplicate_submissions = 3;
+}
+
 message WorkerStatus {
   string worker_id = 1;
   string current_episode_id = 2;
@@ -142,6 +165,7 @@ service Coordinator {
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
   rpc SubmitResult(SubmitResultRequest) returns (SubmitResultResponse);
   rpc GetRunStatus(RunStatusRequest) returns (RunStatusResponse);
+  rpc GetRunResults(RunResultsRequest) returns (RunResultsResponse);
   // Server-streaming live progress, for a dashboard that should not poll.
   rpc WatchRun(RunStatusRequest) returns (stream RunStatusResponse);
 }

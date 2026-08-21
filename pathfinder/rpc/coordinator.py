@@ -196,6 +196,19 @@ class CoordinatorService(pathfinder_pb2_grpc.CoordinatorServicer):
         async with self._lock:
             return self._status()
 
+    async def GetRunResults(self, request, context):  # noqa: N802
+        """The full result rows with their provenance, for a report collector.
+
+        Kept out of ``RunStatusResponse`` deliberately: status is polled by
+        dashboards, and results grow with the run.
+        """
+        async with self._lock:
+            return pathfinder_pb2.RunResultsResponse(
+                run_id=self.run.run_id,
+                results=list(self.run.results.values()),
+                duplicate_submissions=self.run.duplicates,
+            )
+
     async def WatchRun(self, request, context):  # noqa: N802
         """Stream status until the run completes or the client disconnects."""
         while True:
