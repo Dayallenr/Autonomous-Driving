@@ -161,6 +161,7 @@ def test_report_aggregates_all_four_evidence_sources():
     assert report["queue"]["redeliveries"] == 1
     assert report["telemetry"]["rows_written"] == 100
     assert report["summary"]["episodes"] == 2
+    assert report["suite_source"] == "caller-provided specs"
     assert report["episodes_missing_results"] == []
     assert report["results_not_in_suite"] == []
     assert report["failed_episodes"] == []
@@ -213,6 +214,7 @@ def rendered() -> str:
 def test_writeup_carries_the_required_sentences(rendered):
     assert "Scope: pipeline-only" in rendered
     assert "results/distributed/report.json" in rendered
+    assert "Suite source: caller-provided specs" in rendered
     assert "at-least-once" in rendered
     assert "Redeliveries: 1" in rendered
     assert "Dead-lettered: 0" in rendered
@@ -284,6 +286,10 @@ def test_cli_collects_from_a_live_coordinator_and_lands_both_artifacts(tmp_path)
     assert started.wait(5), "coordinator never came up"
 
     output = tmp_path / "report.json"
+    manifest = tmp_path / "suite.json"
+    manifest.write_text(
+        json.dumps([make_spec(0).to_dict(), make_spec(1).to_dict()]), encoding="utf-8"
+    )
     try:
         code = distributed_run.main(
             [
@@ -291,6 +297,14 @@ def test_cli_collects_from_a_live_coordinator_and_lands_both_artifacts(tmp_path)
                 "--queue-backend", "local",
                 "--episodes", "2",
                 "--output", str(output),
+            ]
+        )
+        manifest_code = distributed_run.main(
+            [
+                "--coordinator", f"127.0.0.1:{box['port']}",
+                "--queue-backend", "local",
+                "--suite", str(manifest),
+                "--output", str(tmp_path / "manifest_report.json"),
             ]
         )
     finally:
@@ -303,4 +317,17 @@ def test_cli_collects_from_a_live_coordinator_and_lands_both_artifacts(tmp_path)
     assert report["scope"] == SCOPE_PIPELINE_ONLY
     assert report["summary"] is None
     assert report["telemetry"]["archived"] is False
+    # A reconstructed suite must confess to being one.
+    assert report["suite_source"].startswith("reconstructed from CLI flags")
     assert output.with_suffix(".md").exists()
+
+    # With the enqueuer's manifest, the report records the manifest's own
+    # specs and names the file it read them from.
+    assert manifest_code == 0
+    manifest_report = json.loads(
+        (tmp_path / "manifest_report.json").read_text(encoding="utf-8")
+    )
+    assert manifest_report["suite_source"] == f"suite manifest {manifest}"
+    assert [entry["episode_id"] for entry in manifest_report["episodes"]] == [
+        "ep-0000", "ep-0001",
+    ]

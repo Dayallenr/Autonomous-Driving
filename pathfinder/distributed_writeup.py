@@ -188,6 +188,7 @@ def render_writeup(report: dict, *, source: str) -> str:
         "the scope banner above allows.",
         "",
         *suite_section(report["episodes"], episodes_label="Episodes"),
+        f"- Suite source: {report['suite_source']}",
         "",
         "## Coordinator",
         "",

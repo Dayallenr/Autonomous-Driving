@@ -164,12 +164,18 @@ def build_distributed_report(
     duplicate_submissions: int,
     queue,
     telemetry: dict | None = None,
+    suite_source: str = "caller-provided specs",
 ) -> dict:
     """Assemble the one report dict from the run's four evidence sources.
 
     Args:
         specs: The suite that was enqueued, for the report's episode list and
             for cross-checking that results and suite agree.
+        suite_source: Where ``specs`` came from, recorded in the artifact.
+            The id-level cross-check below cannot catch a reconstructed suite
+            whose ids match but whose seeds or route lengths differ from what
+            was actually enqueued, so the report must say whether its suite
+            is the enqueuer's own record or a reconstruction.
         status: The coordinator's ``RunStatusResponse``.
         results: The coordinator's ``EpisodeResult`` protos.
         duplicate_submissions: The coordinator's duplicate-submission count —
@@ -224,6 +230,7 @@ def build_distributed_report(
             }
         ),
         "episodes": [spec.to_dict() for spec in specs],
+        "suite_source": suite_source,
         "results": rows,
         "summary": aggregate(scores).to_dict() if scores else None,
         "failed_episodes": sorted(
@@ -245,6 +252,7 @@ async def collect_report(
     specs: list[EpisodeSpec],
     queue,
     telemetry: dict | None = None,
+    suite_source: str = "caller-provided specs",
 ) -> dict:
     """Query the coordinator over gRPC and assemble the report.
 
@@ -253,6 +261,8 @@ async def collect_report(
         specs: The suite that was enqueued.
         queue: The work queue, read for statistics.
         telemetry: An :func:`archive_telemetry` dict, or ``None``.
+        suite_source: Where ``specs`` came from — see
+            :func:`build_distributed_report`.
     """
     client = CoordinatorClient.connect(coordinator_address)
     try:
@@ -269,6 +279,7 @@ async def collect_report(
         duplicate_submissions=results.duplicate_submissions,
         queue=queue,
         telemetry=telemetry,
+        suite_source=suite_source,
     )
 
 
@@ -283,12 +294,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--coordinator", type=str, required=True, help="host:port")
 
     parser.add_argument(
+        "--suite", type=Path, default=None,
+        help="the suite manifest enqueue_episodes.py --suite-out wrote — the "
+        "enqueuer's own record of what went onto the queue. Prefer this over "
+        "the reconstruction flags below: reconstruction can silently record "
+        "wrong seeds or route lengths if its flags drift from the enqueuer's.",
+    )
+    parser.add_argument(
         "--episodes", type=int, default=8,
-        help="suite size, matching what was enqueued (enqueue_episodes.py --count)",
+        help="suite size, matching what was enqueued (enqueue_episodes.py --count); "
+        "ignored when --suite is given",
     )
     parser.add_argument(
         "--route-length-m", type=float, default=400.0,
-        help="suite route length, matching what was enqueued",
+        help="suite route length, matching what was enqueued; ignored when "
+        "--suite is given",
     )
 
     parser.add_argument("--queue-backend", choices=["local", "sqs"], default="sqs")
@@ -329,7 +349,21 @@ def main(argv: list[str] | None = None) -> int:
     from pathfinder.cloud.warehouse import TelemetryWarehouse
     from pathfinder.orchestration import build_episode_specs
 
-    specs = build_episode_specs(count=args.episodes, route_length_m=args.route_length_m)
+    if args.suite is not None:
+        import json
+
+        specs = [
+            EpisodeSpec.from_dict(entry)
+            for entry in json.loads(args.suite.read_text(encoding="utf-8"))
+        ]
+        suite_source = f"suite manifest {args.suite}"
+    else:
+        specs = build_episode_specs(count=args.episodes, route_length_m=args.route_length_m)
+        suite_source = (
+            "reconstructed from CLI flags (--episodes/--route-length-m), not "
+            "read from the enqueuer's record; seeds and route lengths are "
+            "only as right as those flags"
+        )
 
     queue_url = args.queue_url
     if args.queue_backend == "sqs" and not queue_url:
@@ -368,6 +402,7 @@ def main(argv: list[str] | None = None) -> int:
             specs=specs,
             queue=queue,
             telemetry=telemetry,
+            suite_source=suite_source,
         )
     )
 

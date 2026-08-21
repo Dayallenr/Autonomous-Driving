@@ -89,11 +89,16 @@ def test_chaos_kill_redelivery_parquet_and_report(tmp_path):
         address = f"127.0.0.1:{port}"
 
         try:
-            # Act 1: the chaos worker takes the first episode and dies
-            # mid-drive, after emitting some telemetry but before
-            # acknowledging the message or submitting a result.
-            with pytest.raises(ChaosKill):
-                await run_worker(
+            # Both workers run concurrently, competing for the same queue and
+            # heartbeating the same coordinator — the spec's "coordinator and
+            # two kinematic workers". The chaos worker dies mid-drive on
+            # whichever episode it received first, after emitting some
+            # telemetry but before acknowledging the message or submitting a
+            # result; the survivor's idle timeout outlasts the visibility
+            # timeout, so it is still polling when the dead worker's episode
+            # reappears, and completes it too.
+            chaos_task = asyncio.create_task(
+                run_worker(
                     worker_id="worker-chaos",
                     coordinator_address=address,
                     queue=queue,
@@ -103,23 +108,24 @@ def test_chaos_kill_redelivery_parquet_and_report(tmp_path):
                     receive_wait_seconds=0.2,
                     telemetry_stream=stream,
                 )
-
-            # The episode it held is in flight, not lost and not visible yet.
-            assert queue.in_flight() == 1
-            assert queue.approximate_depth() == EPISODES - 1
-
-            # Act 2: the survivor drains the queue. Its idle timeout outlasts
-            # the visibility timeout, so it is still polling when the dead
-            # worker's episode reappears, and completes it too.
-            survivor_results = await run_worker(
-                worker_id="worker-survivor",
-                coordinator_address=address,
-                queue=queue,
-                simulator_backend="kinematic",
-                idle_timeout_seconds=VISIBILITY_TIMEOUT + 2.0,
-                receive_wait_seconds=0.2,
-                telemetry_stream=stream,
             )
+            survivor_task = asyncio.create_task(
+                run_worker(
+                    worker_id="worker-survivor",
+                    coordinator_address=address,
+                    queue=queue,
+                    simulator_backend="kinematic",
+                    idle_timeout_seconds=VISIBILITY_TIMEOUT + 2.0,
+                    receive_wait_seconds=0.2,
+                    telemetry_stream=stream,
+                )
+            )
+            with pytest.raises(ChaosKill):
+                await chaos_task
+            # The episode the dead worker held is in flight — hidden by its
+            # visibility timeout, not lost — while the survivor works on.
+            assert queue.in_flight() >= 1
+            survivor_results = await survivor_task
             assert len(survivor_results) == EPISODES
 
             # Act 3: archive telemetry and collect the report over real gRPC.
@@ -138,12 +144,15 @@ def test_chaos_kill_redelivery_parquet_and_report(tmp_path):
     report, store, survivor_results, service = asyncio.run(body())
 
     # The killed worker's episode was redelivered and completed by the
-    # survivor, and the report's redelivery count says so.
-    killed_episode = specs[0].episode_id
+    # survivor, and the report's redelivery count says so. Which episode the
+    # chaos worker drew is a race between the two live workers, so the report
+    # is what names it — exactly one episode was ever delivered twice.
     assert report["queue"]["redeliveries"] == 1
-    assert report["queue"]["redelivered_episodes"] == [
-        {"episode_id": killed_episode, "completed_by": "worker-survivor", "receive_count": 2}
-    ]
+    [redelivered] = report["queue"]["redelivered_episodes"]
+    killed_episode = redelivered["episode_id"]
+    assert killed_episode in {spec.episode_id for spec in specs}
+    assert redelivered["completed_by"] == "worker-survivor"
+    assert redelivered["receive_count"] == 2
 
     # Nothing was lost and nothing was poisoned: the queue is empty, the
     # dead-letter queue is empty, and suite and results match exactly.
