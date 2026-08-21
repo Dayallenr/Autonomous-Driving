@@ -52,6 +52,19 @@ from pathfinder.sim.carla_backend import build_simulator
 logger = logging.getLogger(__name__)
 
 
+def _chaos_exit() -> None:
+    """Die the way a SIGKILL'd worker dies: immediately, with no cleanup —
+    no queue delete, no telemetry flush, no goodbye heartbeat. ``os._exit``
+    (not ``sys.exit``) is the point: every ``finally`` block is skipped, so
+    the in-flight episode stays unacknowledged for the visibility timeout to
+    redeliver. A module-level seam so tests can observe the kill without
+    losing the process. Exit code 70 = EX_SOFTWARE, distinguishable from a
+    clean exit in the runbook transcript."""
+    import os
+
+    os._exit(70)
+
+
 async def _drain_one(
     queue: MessageQueue,
     simulator,
@@ -62,6 +75,7 @@ async def _drain_one(
     wait_seconds: float,
     model_version: str = "",
     telemetry_stream: TelemetryStream | None = None,
+    chaos_countdown: list[int] | None = None,
 ) -> tuple[EpisodeScore, int] | None:
     """Receive and run at most one episode. Returns the score together with
     the message's delivery count (above 1 means the queue redelivered it —
@@ -90,6 +104,24 @@ async def _drain_one(
         def telemetry_sink(row: dict) -> None:
             telemetry_stream.put(row["episode_id"], row)
 
+    if chaos_countdown is not None:
+        # The sink is the one per-frame hook run_episode exposes, so the
+        # chaos kill rides it (counting even when telemetry is off). The
+        # countdown lives across episodes in run_worker's single-element
+        # list, though at any sensible setting it fires inside the first.
+        inner_sink = telemetry_sink
+
+        def telemetry_sink(row: dict) -> None:
+            chaos_countdown[0] -= 1
+            if chaos_countdown[0] <= 0:
+                logger.warning(
+                    "chaos kill firing mid-episode %s (frame budget exhausted)",
+                    row["episode_id"],
+                )
+                _chaos_exit()
+            if inner_sink is not None:
+                inner_sink(row)
+
     try:
         score = await asyncio.to_thread(
             run_episode, simulator, spec, policy,
@@ -116,6 +148,7 @@ async def run_worker(
     stop_event: asyncio.Event | None = None,
     telemetry_stream: TelemetryStream | None = None,
     policy: Policy | None = None,
+    chaos_kill_after_frames: int = 0,
 ) -> list[EpisodeScore]:
     """Register, then loop episodes until the queue drains, the coordinator
     asks this worker to stop, or ``stop_event`` is set (e.g. by a SIGTERM
@@ -127,7 +160,13 @@ async def run_worker(
     ``policy_name`` — the same seam the DAgger loop exposes (#15), for tests
     and for Policies whose construction needs more than a name. The caller
     owns label honesty: ``policy_name``/``model_version`` still stamp every
-    result, so they must describe what the injected Policy actually is."""
+    result, so they must describe what the injected Policy actually is.
+
+    ``chaos_kill_after_frames > 0`` arms the redelivery drill the #22/#26
+    runbook kills a worker with: after that many driven frames the process
+    dies via :func:`_chaos_exit`, leaving its in-flight episode
+    unacknowledged. Deterministically mid-episode, which no external kill
+    can time on a kinematic backend's ~10 ms episodes."""
     client = CoordinatorClient.connect(coordinator_address)
     results: list[EpisodeScore] = []
     state = WorkerHeartbeatState()
@@ -146,6 +185,7 @@ async def run_worker(
     simulator = build_simulator(simulator_backend)
     label = result_label(policy_name, model_version)
     idle_since: float | None = None
+    chaos_countdown = [chaos_kill_after_frames] if chaos_kill_after_frames > 0 else None
 
     try:
         # After the simulator: a Policy that drives the simulator's own actor
@@ -160,6 +200,7 @@ async def run_worker(
                 queue, simulator, policy,
                 worker_id=worker_id, state=state, wait_seconds=receive_wait_seconds,
                 model_version=label, telemetry_stream=telemetry_stream,
+                chaos_countdown=chaos_countdown,
             )
             if drained is None:
                 # idle_timeout_seconds <= 0 means "never give up" — the shape
@@ -240,6 +281,13 @@ def main() -> None:
         "does not carry.",
     )
     parser.add_argument("--idle-timeout-seconds", type=float, default=5.0)
+    parser.add_argument(
+        "--chaos-kill-after-frames", type=int, default=0,
+        help="Redelivery drill for the distributed-run runbook (#22/#26): after this "
+        "many driven frames the worker dies abruptly (os._exit, exit code 70 — no "
+        "queue delete, no telemetry flush), leaving its in-flight episode for the "
+        "visibility timeout to hand to a surviving worker. 0 disables.",
+    )
     cloud_cli.add_telemetry_args(
         parser,
         backend_help="Stream per-frame telemetry as episodes run. 'none' skips it entirely "
@@ -281,6 +329,7 @@ async def _run_with_signal_handling(
         idle_timeout_seconds=args.idle_timeout_seconds,
         stop_event=stop_event,
         telemetry_stream=telemetry_stream,
+        chaos_kill_after_frames=args.chaos_kill_after_frames,
     )
 
 

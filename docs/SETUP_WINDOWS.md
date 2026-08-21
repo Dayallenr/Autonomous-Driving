@@ -191,6 +191,170 @@ Then tell the agent the run is done — the review is agent work: quoting the
 score and the printed go / stop-and-reassess verdict on #16 and on #11,
 **before** any training happens (the gate paragraph in #16 requires it).
 
+## 9. Distributed-run runbook (issues #22 → #26)
+
+The full distributed benchmark, as one replayable sitting: seed the suite
+onto SQS, run the coordinator and workers, kill a worker mid-Episode, watch
+the visibility timeout redeliver its Episode to a survivor, archive
+telemetry to Parquet, and collect the one report artifact.
+
+**Everything that differs between the LocalStack rehearsal (#22) and the
+real-SQS run (#26) lives in the configuration block of step 9.1 — endpoint,
+credentials, queue URLs, and the run/artifact labels. Every command from
+step 9.2 on is identical in both sittings.** Two declared scope boundaries,
+neither an endpoint difference: the CARLA worker (step 9.5) only runs in the
+real sitting, because the rehearsal machine cannot run CARLA — the rehearsal
+proves the same worker command with the kinematic backend; and telemetry +
+warehouse stay on the `local` backends in **both** sittings, because Kinesis
+and S3 are never applied to real AWS (zero-spend rule — SQS's permanent free
+tier is the one exception).
+
+Executed end to end against LocalStack on 2026-08-21 (macOS, kinematic
+workers; the variable-assignment and line-continuation syntax below is
+PowerShell's — on a POSIX shell drop the `$env:`/backtick decoration — but
+the command tokens are identical):
+`results/distributed/localstack_rehearsal.{json,md}` is the rehearsal's
+artifact — 8/8 episodes, the killed worker's Episode redelivered and
+completed by the survivor, DLQ empty.
+
+Two terminals: **A** for the coordinator, **B** for everything else (the
+real sitting adds **C** for the CARLA worker). Steps 9.3–9.7 run unattended;
+total rehearsal time is ~2 minutes, dominated by the 30 s visibility
+timeout.
+
+### 9.1 Configuration (the only rehearsal↔real difference)
+
+Rehearsal (LocalStack) — in terminal B:
+
+```powershell
+docker compose up -d localstack        # rehearsal only; wait for healthy
+$env:AWS_ACCESS_KEY_ID = "test"        # LocalStack accepts any credentials
+$env:AWS_SECRET_ACCESS_KEY = "test"
+$SQS_ENDPOINT = "http://localhost:4566"
+python scripts/provision_sqs.py --endpoint-url $SQS_ENDPOINT
+# ^ the rehearsal stand-in for #18's Terraform apply: creates
+#   pathfinder-episodes + pathfinder-episodes-dlq shaped exactly like
+#   terraform/sqs.tf, and prints the two URLs to paste here:
+$QUEUE_URL = "<QUEUE_URL printed above>"
+$DLQ_URL = "<DLQ_URL printed above>"
+$RUN_ID = "localstack-rehearsal"
+$REPORT = "results/distributed/localstack_rehearsal.json"
+```
+
+Real run — credentials from `aws configure` (issue #18's wizard, run once),
+queue URLs from that wizard's Terraform outputs:
+
+```powershell
+$SQS_ENDPOINT = "https://sqs.us-east-1.amazonaws.com"
+$QUEUE_URL = "<episodes queue URL from the #18 Terraform output>"
+$DLQ_URL = "<DLQ URL from the #18 Terraform output>"
+$RUN_ID = "sqs-live"
+$REPORT = "results/distributed/live_report.json"
+```
+
+The endpoint flag is passed in **both** sittings — the real run points it at
+the real SQS endpoint — so the commands below never change shape.
+
+### 9.2 Coordinator — terminal A
+
+```powershell
+python -m pathfinder.rpc.server --port 50051 --episodes-total 8 --run-id $RUN_ID
+```
+
+Leave it running; every later step talks to it. (`$RUN_ID` is defined in
+terminal B — when using a separate terminal, type the label literally.)
+
+### 9.3 Seed the queue — terminal B
+
+```powershell
+python scripts/enqueue_episodes.py --count 8 `
+    --queue-backend sqs --queue-url $QUEUE_URL --queue-endpoint-url $SQS_ENDPOINT `
+    --suite-out results/distributed/suite.json
+```
+
+The suite manifest is the enqueuer's own record of what went onto the queue;
+step 9.6 reads it back so the report describes what was actually enqueued.
+
+### 9.4 The chaos kill — terminal B
+
+A kinematic Episode takes ~10 ms, so no by-hand kill can land mid-Episode;
+`--chaos-kill-after-frames` is the deterministic version. This worker takes
+one Episode off the queue, drives 200 frames, and dies the way a SIGKILL'd
+worker dies (exit code 70, no cleanup, no queue delete, no telemetry flush).
+Its Episode stays invisible for the 30 s visibility timeout, then redelivers:
+
+```powershell
+python scripts/run_worker.py --worker-id chaos-victim --coordinator localhost:50051 `
+    --queue-backend sqs --queue-url $QUEUE_URL --queue-endpoint-url $SQS_ENDPOINT `
+    --simulator-backend kinematic --policy pure_pursuit `
+    --telemetry-backend local --telemetry-local-root ./telemetry `
+    --chaos-kill-after-frames 200
+```
+
+### 9.5 The surviving worker(s) — terminal B (and C in the real sitting)
+
+`--idle-timeout-seconds 45` must outlast the 30 s visibility timeout: the
+survivor drains the seven visible Episodes in seconds, then keeps polling
+until the victim's Episode reappears, completes it, and exits.
+
+```powershell
+python scripts/run_worker.py --worker-id kinematic-1 --coordinator localhost:50051 `
+    --queue-backend sqs --queue-url $QUEUE_URL --queue-endpoint-url $SQS_ENDPOINT `
+    --simulator-backend kinematic --policy pure_pursuit `
+    --telemetry-backend local --telemetry-local-root ./telemetry `
+    --idle-timeout-seconds 45
+```
+
+**Real sitting only** — the CARLA worker, in terminal C, started *before*
+step 9.4 so it holds an Episode while the kinematic worker drains the rest
+(CarlaUE4.exe running, same flags as terminal B's config block):
+
+```powershell
+python scripts/run_worker.py --worker-id carla-1 --coordinator localhost:50051 `
+    --queue-backend sqs --queue-url $QUEUE_URL --queue-endpoint-url $SQS_ENDPOINT `
+    --simulator-backend carla --policy pure_pursuit `
+    --telemetry-backend local --telemetry-local-root ./telemetry `
+    --idle-timeout-seconds 45
+```
+
+### 9.6 Archive telemetry + collect the report — terminal B
+
+One command: drains the telemetry stream into partitioned Parquet under
+`./warehouse`, queries the coordinator for status and results, reads the
+queue's redelivery/DLQ state, and lands report JSON + generated write-up
+together:
+
+```powershell
+python -m pathfinder.distributed_run --coordinator localhost:50051 `
+    --suite results/distributed/suite.json `
+    --queue-backend sqs --queue-url $QUEUE_URL --dead-letter-queue-url $DLQ_URL `
+    --queue-endpoint-url $SQS_ENDPOINT `
+    --telemetry-backend local --telemetry-local-root ./telemetry `
+    --object-backend local --object-local-root ./warehouse `
+    --output $REPORT
+```
+
+Expected in the printed tail and the artifact: 8/8 episodes, **1
+redelivery** (the victim's Episode, completed by a survivor, delivered 2
+times), **0 dead-lettered**, depth 0. Anything else is a finding — read the
+report's suite cross-check section before trusting the run.
+
+### 9.7 Shut down and check in — terminal B
+
+Stop the coordinator (Ctrl+C in terminal A). Rehearsal only:
+`docker compose stop localstack`. Then commit the artifact pair and the
+suite manifest:
+
+```powershell
+git add results/distributed
+git commit -m "Execute the distributed-run rehearsal against LocalStack (#22)"
+git push
+```
+
+(The real sitting commits `live_report.{json,md}` and quotes its numbers on
+#12/#26 instead; `./telemetry` and `./warehouse` are working data and stay
+untracked.)
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
