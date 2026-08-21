@@ -21,9 +21,12 @@ destroys that.
 **Corollary: never report a number you have not personally seen produced.** If
 results exist only on another machine or in a chat message, they do not exist.
 
-**Quoting a number in a document?** Use the citation convention in
-`docs/CLAIMS.md` — a Markdown link naming the artifact and JSON field path —
-and the claim checker (`pathfinder/claims.py`, run by
+**`CLAIMS.md` at the repo root is the claim-of-record** (#24): every
+load-bearing claim mapped to its evidence, machine-checked rows and
+prose-audited boundary rows both. A new claim lands there first, then in any
+other document. **Quoting a number in a document?** Use the citation
+convention in `docs/CLAIMS.md` — a Markdown link naming the artifact and JSON
+field path — and the claim checker (`pathfinder/claims.py`, run by
 `tests/test_claims_checker.py` in the ordinary suite) verifies it in CI.
 
 ---
@@ -106,7 +109,7 @@ scores 0.963 mAP@0.5 on the leaky split and the honestly-trained YOLOv8m scores
 already memorised them.
 
 **YOLOv8m honest result: mAP@0.5 = 0.475**, mAP@0.5:0.95 = 0.307, precision
-0.586, recall 0.440. Per-class AP@0.5: car 0.872, truck 0.794, pedestrian 0.626,
+0.586, recall 0.440. Per-class AP@0.5: car 0.872, truck 0.794, pedestrian 0.625,
 tram 0.529, van 0.442, cyclist 0.425, misc 0.106, person_sitting 0.005.
 
 **The detector's problem is recall, not classification.** The confusion matrix
@@ -220,7 +223,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 7 Terraform / LocalStack / kind | **Written, never applied** — `terraform/` passes `fmt -check`, `init -backend=false`, `validate`, and `checkov` in CI; provisions EKS, ECR, SQS+DLQ, S3, **Kinesis**, KMS, IRSA, GitHub OIDC. `k8s/` carries kind manifests and an `eks/` overlay. Nothing has been applied to real AWS |
 | 8 CI/CD | **Done** — `.github/workflows/ci.yml` (ruff, pytest, hadolint, Docker build, trivy, compose validate, terraform validate + checkov) and `deploy.yml` (manual `workflow_dispatch` only) |
 | 9 README + demo | Not started; current README describes the old project |
-| 10 Claim-to-artifact mapping | **In progress** — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table (#24) and README opt-in (#23) are next |
+| 10 Claim-to-artifact mapping | **In progress** — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table landed (#24, 2026-08-21): root `CLAIMS.md` is the claim-of-record — every established finding cited machine-checked, the boundary claims prose-audited, all passing in CI (`python -m pathfinder.claims` for the live counts). The README opt-in (#23) is next |
 
 413 tests pass on the Mac; `ruff check` clean.
 
