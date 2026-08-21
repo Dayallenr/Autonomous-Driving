@@ -35,6 +35,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pathfinder import reporting
 from pathfinder.comparison import DEFAULT_SUITE
 from pathfinder.metrics.driving_score import EpisodeScore, aggregate
 from pathfinder.policies import CarlaBehaviorAgentPolicy
@@ -82,23 +83,21 @@ _GATE_DEFINITION = (
 
 
 def _scope(backend_name: str) -> tuple[str, str]:
-    """What the report's numbers are allowed to mean. Mirrors the ablation:
-    only CARLA earns the driving-quality label, and an unknown backend
-    defaults to pipeline-only because the safe failure mode is underclaiming."""
-    if backend_name == "carla":
-        return (
-            "driving-quality",
+    """What the report's numbers are allowed to mean; the reference run's
+    sentences over the shared rule that only CARLA earns the driving-quality
+    label."""
+    return reporting.scope(
+        backend_name,
+        driving_quality_note=(
             "Generated on the CARLA backend: the score measures the behaviour "
             "agent's driving quality over the recorded suite. It is a "
-            "reference ceiling, not project work.",
-        )
-    return (
-        "pipeline-only",
-        f"Generated on the {backend_name} backend, which cannot run the real "
-        "behaviour agent and neither simulates real physics nor renders real "
-        "scenes. These numbers verify the reference-run pipeline end to end; "
-        "they are not driving quality and must never be quoted as such. The "
-        "real measurement comes from the CARLA backend.",
+            "reference ceiling, not project work."
+        ),
+        pipeline_limits=(
+            "cannot run the real behaviour agent and neither simulates real "
+            "physics nor renders real scenes"
+        ),
+        pipeline_label="reference-run pipeline",
     )
 
 
@@ -127,7 +126,7 @@ def floor_gate(
 
     if floor_report is None:
         return not_computed(f"no floor report found at {floor_source or '<none>'}")
-    if reference_report["scope"] != "driving-quality":
+    if reference_report["scope"] != reporting.SCOPE_DRIVING_QUALITY:
         return not_computed(
             f"this run is {reference_report['scope']}, and only a "
             "driving-quality run can be gated against the CARLA floor"
@@ -137,7 +136,7 @@ def floor_gate(
             f"{floor_source} is not a perception_ablation report "
             f"(kind={floor_report.get('kind')!r})"
         )
-    if floor_report.get("scope") != "driving-quality":
+    if floor_report.get("scope") != reporting.SCOPE_DRIVING_QUALITY:
         return not_computed(
             f"the floor report at {floor_source} is "
             f"{floor_report.get('scope')!r}, not driving-quality"
@@ -376,19 +375,7 @@ def main(argv: list[str] | None = None) -> int:
     simulator_kwargs = {"render": True} if args.backend == "kinematic" else {}
 
     output = args.output or Path("results/reference") / f"{args.backend}_report.json"
-    output.parent.mkdir(parents=True, exist_ok=True)
-
-    # Every finished Episode lands here immediately, so a crash late in the
-    # suite costs one episode, not the sitting. Removed once the full report
-    # exists — a lingering partial would mean the run did not finish.
-    partial = output.with_suffix(".partial.jsonl")
-    partial.unlink(missing_ok=True)
-
-    def checkpoint(model_version: str, score: EpisodeScore) -> None:
-        with partial.open("a", encoding="utf-8") as handle:
-            handle.write(
-                json.dumps({"model_version": model_version, **score.to_dict()}) + "\n"
-            )
+    artifact = reporting.ReportArtifact(output, label_key="model_version")
 
     with build_simulator(args.backend, **simulator_kwargs) as simulator:
         try:
@@ -403,19 +390,10 @@ def main(argv: list[str] | None = None) -> int:
             policy,
             floor_report=floor_report,
             floor_source=str(args.floor_report),
-            on_episode=checkpoint,
+            on_episode=artifact.checkpoint,
         )
 
-    output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    partial.unlink(missing_ok=True)
-
-    # The write-up lands with the report so a CARLA sitting can never end with
-    # numbers but no document stating what they are allowed to mean.
-    writeup = output.with_suffix(".md")
-    # encoding="utf-8" is not optional: write_text defaults to the locale
-    # encoding, which is cp1252 on Windows, and the rendered write-up contains
-    # non-ASCII characters (see ablation.py).
-    writeup.write_text(render_writeup(report, source=str(output)), encoding="utf-8")
+    writeup = artifact.finish(report, render_writeup)
 
     print(f"backend: {report['backend']} ({report['scope']})")
     print(
@@ -432,10 +410,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     else:
         print(f"floor gate: not computed — {gate['reason']}")
-    if report["scope"] == "pipeline-only":
-        print("NOTE: pipeline-only run — these numbers are not driving quality.")
-    print(f"report written to {output}")
-    print(f"write-up written to {writeup}")
+    reporting.print_cli_tail(report, output, writeup)
     return 0
 
 

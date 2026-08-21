@@ -307,6 +307,12 @@ pathfinder/
   ablation_writeup.py — renders a report JSON into its Markdown write-up
               (scope banner, boundary sentence, infraction breakdown,
               binding-constraint verdict); called by the ablation CLI
+  reporting.py — the one home (#29) for what every report kind above shares:
+              the scope rule (only CARLA earns driving-quality), ReportArtifact
+              (partial checkpoints + report/write-up landing, utf-8 explicit),
+              the CLI tail, common write-up helpers, and the write-up
+              regenerator CLI. A new report kind starts here, not by copying
+              a sibling
 scripts/      prepare_kitti.py · train_detector.py · eval_detector.py
               plot_data_report.py · probe_carla.py · generate_protos.py
               bench_rpc_latency.py · run_worker.py · enqueue_episodes.py

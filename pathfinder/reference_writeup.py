@@ -16,24 +16,16 @@ artifacts land together.
 """
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-
-__all__ = ["render_writeup"]
-
-#: The sentence that travels with the behaviour agent wherever it appears,
-#: matching ``pathfinder/comparison_writeup.py``'s stance.
-_NOT_PROJECT_WORK = (
-    "CARLA's own behaviour agent — **not project work**. It reads the "
-    "simulator's world state directly and appears only as a reference upper "
-    "bound produced by the same routes, traffic, and scoring; nothing it "
-    "does may be presented as this project's driving."
+from pathfinder.reporting import (
+    NOT_PROJECT_WORK,
+    generated_from,
+    infraction_table,
+    regenerate_writeup_main,
+    scope_banner,
+    suite_section,
 )
 
-
-def _unique_in_order(values: list[str]) -> list[str]:
-    return list(dict.fromkeys(values))
+__all__ = ["render_writeup"]
 
 
 def _results_table(report: dict) -> list[str]:
@@ -55,12 +47,10 @@ def _results_table(report: dict) -> list[str]:
 
 
 def _infraction_table(report: dict) -> list[str]:
-    totals = report["summary"]["infraction_totals"]
-    if not totals:
-        return ["No scoreable or tracked infraction was committed."]
-    lines = ["| Infraction | Count |", "|---|---|"]
-    lines += [f"| {name} | {totals[name]} |" for name in sorted(totals)]
-    return lines
+    return infraction_table(
+        [("Count", report["summary"]["infraction_totals"])],
+        empty_message="No scoreable or tracked infraction was committed.",
+    )
 
 
 def _per_episode_table(report: dict) -> list[str]:
@@ -112,24 +102,18 @@ def render_writeup(report: dict, *, source: str) -> str:
         source: Path of the report artifact, as the write-up should cite it —
             the traceability link from every number back to the run.
     """
-    specs = report["episodes"]
-    towns = _unique_in_order([spec["town"] for spec in specs])
-    weathers = _unique_in_order([spec["weather"] for spec in specs])
-    seeds = [spec["seed"] for spec in specs]
     behavior = report.get("behavior")
 
     lines = [
         f"# BehaviorAgent reference baseline — {report['backend']} backend",
         "",
-        f"Generated {report['generated_at']} from [`{source}`]"
-        f"({Path(source).name}), which records every number below along with "
-        "the full episode specifications needed to re-run it. This file is "
-        "rendered from that artifact by `pathfinder/reference_writeup.py`; "
-        "edit the generator, not this file.",
+        generated_from(
+            report, source=source, generator="pathfinder/reference_writeup.py"
+        ),
         "",
-        f"> **Scope: {report['scope']}.** {report['scope_note']}",
+        scope_banner(report),
         ">",
-        f"> {_NOT_PROJECT_WORK}",
+        f"> {NOT_PROJECT_WORK}",
         "",
         "## What this measures",
         "",
@@ -140,12 +124,7 @@ def render_writeup(report: dict, *, source: str) -> str:
         "teacher-quality measurement the DAgger training design depends on — "
         "an upper bound to cite alongside project results, never as one.",
         "",
-        "## Suite",
-        "",
-        f"- Episodes: {len(specs)}",
-        f"- Towns: {', '.join(towns)}",
-        f"- Weathers: {', '.join(weathers)}",
-        f"- Seeds: {min(seeds)}–{max(seeds)}",
+        *suite_section(report["episodes"], episodes_label="Episodes"),
         "",
         "## Results",
         "",
@@ -177,23 +156,12 @@ def render_writeup(report: dict, *, source: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Regenerate the Markdown write-up for a reference-baseline report."
+    return regenerate_writeup_main(
+        argv,
+        kind="reference_baseline",
+        render_writeup=render_writeup,
+        description="Regenerate the Markdown write-up for a reference-baseline report.",
     )
-    parser.add_argument(
-        "report", type=Path, help="path to a reference_baseline JSON report"
-    )
-    args = parser.parse_args(argv)
-
-    report = json.loads(args.report.read_text(encoding="utf-8"))
-    if report.get("kind") != "reference_baseline":
-        raise SystemExit(f"{args.report} is not a reference_baseline report")
-    output = args.report.with_suffix(".md")
-    # See the note in ablation.py: the rendered write-up is not ASCII, and
-    # write_text without an explicit encoding uses cp1252 on Windows.
-    output.write_text(render_writeup(report, source=str(args.report)), encoding="utf-8")
-    print(f"write-up written to {output}")
-    return 0
 
 
 if __name__ == "__main__":

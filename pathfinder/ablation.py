@@ -29,7 +29,6 @@ attribute a result to a perception that did not run.
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import statistics
 from collections.abc import Callable
@@ -37,6 +36,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pathfinder import reporting
 from pathfinder.ablation_writeup import render_writeup
 from pathfinder.metrics.driving_score import EpisodeScore, aggregate
 from pathfinder.perception.base import Perception, perception_name
@@ -59,24 +59,16 @@ PERCEPTION_BOUNDARY = "perceived obstacles, privileged localization and traffic 
 
 
 def _scope(backend_name: str) -> tuple[str, str]:
-    """What the report's numbers are allowed to mean.
-
-    Only CARLA earns the driving-quality label; anything else — including
-    backends that do not exist yet — defaults to pipeline-only, because the
-    safe failure mode for an unknown backend is underclaiming.
-    """
-    if backend_name == "carla":
-        return (
-            "driving-quality",
+    """What the report's numbers are allowed to mean; the ablation's sentences
+    over the shared rule that only CARLA earns the driving-quality label."""
+    return reporting.scope(
+        backend_name,
+        driving_quality_note=(
             "Generated on the CARLA backend: scores measure driving quality "
-            f"under the stated perception boundary ({PERCEPTION_BOUNDARY}).",
-        )
-    return (
-        "pipeline-only",
-        f"Generated on the {backend_name} backend, which neither simulates real "
-        "physics nor renders real scenes. These numbers verify the ablation "
-        "pipeline end to end; they are not driving quality and must never be "
-        "quoted as such. The real measurement comes from the CARLA backend.",
+            f"under the stated perception boundary ({PERCEPTION_BOUNDARY})."
+        ),
+        pipeline_limits="neither simulates real physics nor renders real scenes",
+        pipeline_label="ablation pipeline",
     )
 
 
@@ -386,32 +378,14 @@ def main(argv: list[str] | None = None) -> int:
     simulator_kwargs = {"render": True} if args.backend == "kinematic" else {}
 
     output = args.output or Path("results/ablation") / f"{args.backend}_report.json"
-    output.parent.mkdir(parents=True, exist_ok=True)
-
-    # Every finished Episode lands here immediately, so a crash on episode 45
-    # of 50 costs one episode, not hours of both arms. Removed once the full
-    # report exists — a lingering partial would mean the run did not finish.
-    partial = output.with_suffix(".partial.jsonl")
-    partial.unlink(missing_ok=True)
-
-    def checkpoint(perception: str, score) -> None:
-        with partial.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps({"perception": perception, **score.to_dict()}) + "\n")
+    artifact = reporting.ReportArtifact(output, label_key="perception")
 
     with build_simulator(args.backend, **simulator_kwargs) as simulator:
-        report = run_ablation(simulator, specs, candidate=candidate, on_episode=checkpoint)
+        report = run_ablation(
+            simulator, specs, candidate=candidate, on_episode=artifact.checkpoint
+        )
 
-    output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    partial.unlink(missing_ok=True)
-
-    # The write-up lands with the report so a CARLA sitting can never end with
-    # numbers but no document stating what they are allowed to mean.
-    writeup = output.with_suffix(".md")
-    # encoding="utf-8" is not optional: write_text defaults to the locale
-    # encoding, which is cp1252 on Windows, and the rendered write-up contains
-    # U+2212 MINUS SIGN. Without it a finished 20-episode CARLA run dies at the
-    # last line and leaves an empty .md beside a valid .json.
-    writeup.write_text(render_writeup(report, source=str(output)), encoding="utf-8")
+    writeup = artifact.finish(report, render_writeup)
 
     print(f"backend: {report['backend']} ({report['scope']})")
     print(f"baseline  {report['baseline']['perception']:>12}: "
@@ -419,10 +393,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"candidate {report['candidate']['perception']:>12}: "
           f"driving score {report['candidate']['summary']['driving_score']}")
     print(f"difference (baseline - candidate): {report['difference']['driving_score']}")
-    if report["scope"] == "pipeline-only":
-        print("NOTE: pipeline-only run — these numbers are not driving quality.")
-    print(f"report written to {output}")
-    print(f"write-up written to {writeup}")
+    reporting.print_cli_tail(report, output, writeup)
     return 0
 
 
