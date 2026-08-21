@@ -10,7 +10,8 @@ ordinary test (`tests/test_claims_checker.py`), so a document that drifts from
 its artifact is a failing build, not a stale sentence.
 
 This page opts in to the checker, so the worked examples below are themselves
-verified in CI.
+verified in CI. The claims themselves live in [the claim-of-record table at
+the repo root](../CLAIMS.md) — this page only defines how to cite one.
 
 ## Opting a document in
 
