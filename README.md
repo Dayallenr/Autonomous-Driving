@@ -1,238 +1,271 @@
-# Autonomous Driving System — CARLA 0.9.14
+# PathFinder
 
-A full autonomous driving stack built from scratch and tested in the [CARLA](https://carla.org/) simulator (v0.9.14). Inspired by systems like Waymo and Tesla FSD, this project implements the five classical ADS modules: Perception, Localization, Prediction, Planning, and Control.
+[![CI](https://github.com/Dayallenr/Autonomous-Driving/actions/workflows/ci.yml/badge.svg)](https://github.com/Dayallenr/Autonomous-Driving/actions/workflows/ci.yml)
 
----
+<!-- claims: checked -->
 
-## System Architecture
-
-```
-CARLA 0.9.14 Simulator
-        │
-        ▼
-┌─────────────────────────────────────────────┐
-│               Sensor Interface              │
-│  RGB Camera │ LiDAR │ GNSS │ IMU            │
-└────┬─────────────┬────────┬────────┬────────┘
-     │             │        │        │
-     ▼             │        ▼        ▼
-┌──────────┐       │  ┌─────────────────────┐
-│Perception│       │  │   Localization      │
-│  (YOLO)  │       │  │   (EKF: GNSS+IMU)   │
-└────┬─────┘       │  └──────────┬──────────┘
-     │             │             │
-     ▼             │             │
-┌──────────────────┴─────────────┴────────────┐
-│                State Aggregator             │
-└──────────────────────┬──────────────────────┘
-                       │
-                       ▼
-            ┌─────────────────┐
-            │   Prediction    │
-            │  (IoU Tracker + │
-            │ Const. Velocity)│
-            └────────┬────────┘
-                     │
-                     ▼
-            ┌─────────────────┐
-            │    Planning     │
-            │  (CIL: ResNet18 │
-            │ + 4 cmd branches│
-            │ → waypoints)    │
-            └────────┬────────┘
-                     │
-                     ▼
-            ┌─────────────────┐
-            │    Control      │
-            │  (Lateral PID + │
-            │ Longitudinal PID│
-            └────────┬────────┘
-                     │
-                     ▼
-            CARLA Vehicle Control
-```
+An autonomous-driving system developed and evaluated in the [CARLA](https://carla.org/)
+simulator (0.9.16), built so that its results can be verified by anyone who
+clones the repo. Every measured result in this document is a link naming the
+artifact and JSON field it quotes, and a checker run in CI
+([convention](docs/CLAIMS.md), claim-of-record in [CLAIMS.md](CLAIMS.md))
+fails the build if a claim drifts from its evidence. Nothing here is
+described from memory.
 
 ---
 
-## Project Structure
+## The findings
+
+**1. The standard KITTI split leaks its validation set.** KITTI's
+[7481](data/manifest.json "claim:frames") object-detection frames come from
+[141](data/manifest.json "claim:drives") continuous 10 Hz video drives, so
+the conventional random split validates the model on scenes it trained on: a
+fraction [0.34](data/manifest.json "claim:baseline_random_split.temporal_adjacency.1.fraction")
+of Ultralytics' bundled validation split sits within one frame (0.1 s) of a
+training frame, [0.76](data/manifest.json "claim:baseline_random_split.temporal_adjacency.2.fraction")
+within two, [0.97](data/manifest.json "claim:baseline_random_split.temporal_adjacency.10.fraction")
+within ten; [106](data/manifest.json "claim:baseline_random_split.drives_shared")
+of [141](data/manifest.json "claim:baseline_random_split.drives_total") drives
+straddle the split. This repo re-splits by drive:
+[0](data/manifest.json "claim:leakage.drives_shared") drives shared between
+train and val.
+
+**2. The leak is worth ≈49 mAP points.** A legacy checkpoint trained on the
+leaky split scores [0.963](results/perception/eval-yolo26m-legacy/report.json "claim:map50")
+mAP@0.5 — *higher* on the "held-out" drives than its original random-split
+figure, because [it had already memorised them](results/perception/eval-yolo26m-legacy/report.json "claim:prose") —
+while the honestly trained YOLOv8m scores
+[0.475](results/perception/yolov8m/report.json "claim:map50") on the
+sequence-disjoint split. The honest number is the project's headline
+detection result, and the gap is the measured price of the leak.
+
+**3. On the road, imperfect perception costs 16 driving-score points — and
+the failure mode is blindness, not caution.** In a two-arm ablation on live
+CARLA (identical seeded Episodes, only perception differs), ground-truth
+perception scores [25.2](results/ablation/carla_report.json "claim:baseline.summary.driving_score")
+and the real detector [8.86](results/ablation/carla_report.json "claim:candidate.summary.driving_score"):
+a gap of [16.34](results/ablation/carla_report.json "claim:difference.driving_score")
+points. The detector arm completes *more* route
+([0.481](results/ablation/carla_report.json "claim:candidate.summary.route_completion")
+vs [0.396](results/ablation/carla_report.json "claim:baseline.summary.route_completion"))
+but collides ten times as often
+([26.5](results/ablation/carla_report.json "claim:candidate.summary.collisions_per_km")
+vs [2.5](results/ablation/carla_report.json "claim:baseline.summary.collisions_per_km")
+per km) — the car drives through what it cannot see.
+
+**4. Even so, perception is not the binding constraint.** Under the
+pre-registered decision rule,
+[the baseline controller's own 74.8-point shortfall from a perfect score exceeds perception's 16.34](results/ablation/carla_report.json "claim:prose") —
+the PurePursuit controller is the bottleneck. That measurement is what makes
+the next phase (a learned policy trained by DAgger) an attack on the right
+problem rather than a tool demo.
+
+## Results
+
+Every row links the artifact that produced it; the reproduction command is in
+[CLAIMS.md](CLAIMS.md) next to each claim.
+
+| Result | Value | Artifact |
+|---|---|---|
+| Detection, honest split (mAP@0.5 / mAP@0.5:0.95) | [0.475](results/perception/yolov8m/report.json "claim:map50") / [0.307](results/perception/yolov8m/report.json "claim:map50_95") over [1376](results/perception/yolov8m/report.json "claim:images") images, [9079](results/perception/yolov8m/report.json "claim:instances") instances | [`results/perception/yolov8m/report.json`](results/perception/yolov8m/report.json) |
+| Detection, leaky-split checkpoint on the same val set | [0.963](results/perception/eval-yolo26m-legacy/report.json "claim:map50") mAP@0.5 | [`results/perception/eval-yolo26m-legacy/report.json`](results/perception/eval-yolo26m-legacy/report.json) |
+| Ablation: privileged vs detector driving score | [25.2](results/ablation/carla_report.json "claim:baseline.summary.driving_score") vs [8.86](results/ablation/carla_report.json "claim:candidate.summary.driving_score") over [10](results/ablation/carla_report.json "claim:baseline.summary.episodes") seeded Episodes per arm, [0](results/ablation/carla_report.json "claim:candidate.summary.failures") failures | [`results/ablation/carla_report.json`](results/ablation/carla_report.json) |
+| Detector inference in the driving loop | [8.35](results/ablation/carla_report.json "claim:candidate.mean_perception_latency_ms") ms/frame mean | [`results/ablation/carla_report.json`](results/ablation/carla_report.json) |
+| CARLA determinism (full Episode, traffic + pedestrians) | two runs of seed [42](results/carla/backend_validation.json "claim:spec.seed") over [1792](results/carla/backend_validation.json "claim:episode1.steps_run") steps end at completion [0.471](results/carla/backend_validation.json "claim:episode1.final_completion") = [0.471](results/carla/backend_validation.json "claim:episode2.final_completion") | [`results/carla/backend_validation.json`](results/carla/backend_validation.json) |
+| CARLA determinism (probe) and throughput | [0.0](results/carla/probe.json "claim:drive.max_divergence_m") m divergence over [120](results/carla/probe.json "claim:drive.steps") ticks; [172.0](results/carla/probe.json "claim:drive.ticks_per_second.1")–[180.85](results/carla/probe.json "claim:drive.ticks_per_second.0") ticks/sec | [`results/carla/probe.json`](results/carla/probe.json) |
+| PurePursuit ceiling on a [351](results/carla/backend_validation.json "claim:episode1.route_length_m") m Town05 route | completion [0.471](results/carla/backend_validation.json "claim:episode1.final_completion"), then `agent_blocked` | [`results/carla/backend_validation.json`](results/carla/backend_validation.json) |
+| gRPC coordinator latency, loopback p50 ([500](results/rpc/latency_report.json "claim:calls_per_rpc") calls/RPC) | RegisterWorker [0.26](results/rpc/latency_report.json "claim:results.0.p50_ms") ms · Heartbeat [0.26](results/rpc/latency_report.json "claim:results.1.p50_ms") ms · SubmitResult [0.26](results/rpc/latency_report.json "claim:results.2.p50_ms") ms · GetRunStatus [0.82](results/rpc/latency_report.json "claim:results.3.p50_ms") ms | [`results/rpc/latency_report.json`](results/rpc/latency_report.json) |
+
+Per-class AP@0.5 for the honest detector: car
+[0.872](results/perception/yolov8m/report.json "claim:per_class.0.ap50"),
+truck [0.794](results/perception/yolov8m/report.json "claim:per_class.4.ap50"),
+pedestrian [0.625](results/perception/yolov8m/report.json "claim:per_class.1.ap50"),
+tram [0.529](results/perception/yolov8m/report.json "claim:per_class.6.ap50"),
+van [0.442](results/perception/yolov8m/report.json "claim:per_class.2.ap50"),
+cyclist [0.425](results/perception/yolov8m/report.json "claim:per_class.3.ap50"),
+misc [0.106](results/perception/yolov8m/report.json "claim:per_class.5.ap50"),
+person_sitting [0.005](results/perception/yolov8m/report.json "claim:per_class.7.ap50").
+Two things to read alongside those numbers: the evaluation protocol is
+strictly harder than published KITTI results, because
+[the dataset conversion dropped difficulty tiers and DontCare regions](scripts/prepare_kitti.py "claim:prose")
+so every object counts however occluded; and `person_sitting` is structurally
+unmeasurable — its entire val set is
+[1](results/perception/yolov8m/report.json "claim:per_class.7.drives") drive
+with [56](results/perception/yolov8m/report.json "claim:per_class.7.instances")
+instances, and [the report flags it low-confidence automatically](results/perception/yolov8m/report.json "claim:prose").
+
+## What this looks like
+
+| The leak, measured | Where the detector fails |
+|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="results/data/split_leakage-dark.png"><img src="results/data/split_leakage.png" alt="Fraction of validation frames within N frames of a training frame: random split vs sequence-disjoint split"></picture> | <img src="results/perception/yolov8m/confusion_matrix_normalized.png" alt="Normalized confusion matrix: missed detections (the bottom background row) dominate the errors"> |
+| Ultralytics' bundled split (orange) puts most val frames within tenths of a second of a training frame; the sequence-disjoint split (blue) has none. Rendered by `scripts/plot_data_report.py`. | The detector's problem is recall, not classification: [missed detections dominate the confusion matrix](results/perception/yolov8m/confusion_matrix.png "claim:prose"); what it does detect it rarely mislabels. |
+
+Detections on sequence-disjoint validation frames — drives the model has
+never seen:
+
+<img src="results/perception/yolov8m/val_batch0_pred.jpg" alt="YOLOv8m predictions on held-out KITTI drives">
+
+A captured clip of a CARLA Episode will land here when it is recorded
+(tracked as issue #27); this README does not wait on it.
+
+## Architecture
+
+The driving loop is a set of small interfaces — swap any part without
+touching the others:
 
 ```
-Autonomous-Driving/
-├── main.py                        Entry point — connects to CARLA and runs the agent
-├── agent.py                       Orchestrates all modules per simulation tick
-├── requirements.txt
-├── config/
-│   └── config.yaml                All tunable parameters
-├── perception/
-│   ├── detector.py                YOLODetector wrapping best_perception_model.pt
-│   └── utils.py                   Detection dataclass, IoU, drawing helpers
-├── sensors/
-│   ├── camera.py                  RGB camera sensor
-│   ├── lidar.py                   LiDAR sensor
-│   ├── gnss_imu.py                GNSS + IMU sensors
-│   └── sensor_hub.py              Unified SensorHub + SensorData snapshot
-├── localization/
-│   └── ekf.py                     6-DOF EKF fusing GNSS + IMU
-├── prediction/
-│   └── predictor.py               IoU tracker + constant-velocity predictor
-├── planning/
-│   ├── cil_model.py               CIL neural network (ResNet-18 + 4 MLP branches)
-│   ├── collect_data.py            Collect driving demonstrations from CARLA autopilot
-│   ├── train_cil.py               Train CIL on collected demonstrations
-│   └── planner.py                 Runtime CIL inference → waypoints
-├── control/
-│   └── pid_controller.py          Lateral + longitudinal PID
-├── data/
-│   └── demonstrations/            Collected (image, command, waypoints) episodes
-├── models/
-│   └── cil_model.pt               Trained CIL model checkpoint (generated by train_cil.py)
-└── best_perception_model.pt       Pre-trained YOLO perception model (KITTI)
+EpisodeSpec (town, route, weather, seed)
+    │
+    ▼
+SimulatorBackend ──► Perception ──► Policy ──► controls, back into the simulator each tick
+ ├ kinematic         ├ privileged   ├ pure_pursuit
+ │  (portable,       │  (ground     ├ cil_student (a DAgger checkpoint)
+ │   no CARLA)       │   truth)     └ carla_builtin_behavior_agent
+ └ CARLA 0.9.16      └ YOLOv8m +       (CARLA's own, reference only)
+    (deterministic)     monocular
+                        range
+
+run_episode emits telemetry every tick ──► stream ──► Parquet warehouse
+and scores the Episode by the CARLA-Leaderboard rule
+(route completion × infraction penalty)
 ```
 
----
+```
+pathfinder/
+  sim/         SimulatorBackend interface; kinematic backend (any laptop) and
+               CARLA 0.9.16 backend; pure-geometry route tracking
+  perception/  Perception protocol; privileged (ground-truth) passthrough;
+               YOLO detector seam; monocular range from a detected box
+  data/        KITTI provenance and the sequence-disjoint split
+  detection/   per-class evaluation reports (instance/image/drive support)
+  metrics/     mAP; CARLA-Leaderboard driving score
+  policies.py  Policy registry: pure_pursuit, cil_student, CARLA's behaviour agent
+  runner.py    one Episode: drive, emit telemetry, score
+  dagger.py    DAgger loop + CLI: per-iteration checkpoints, crash-resume
+  comparison.py / reference_run.py / ablation.py
+               scored comparisons over the same seeded suite, each landing a
+               report JSON + generated write-up
+  cloud/       SQS-semantics queue (visibility timeout, DLQ), Kinesis-shaped
+               telemetry stream, S3 dataset registry, Parquet warehouse,
+               SageMaker-contract training
+  rpc/         gRPC worker coordinator
+  claims.py    the claim checker that verifies this document in CI
+scripts/       KITTI preparation, training, evaluation, CARLA probe/validation
+terraform/     EKS, ECR, SQS+DLQ, S3, Kinesis, KMS, IRSA, GitHub OIDC —
+               validated in CI, never applied
+k8s/           kind manifests + an EKS overlay
+```
 
-## Setup
+Design decisions with reasons are in [`docs/adr/`](docs/adr/); the project
+vocabulary (what "Episode", "Probe", "Detector", "Policy" mean here) is in
+[`CONTEXT.md`](CONTEXT.md).
 
-### 1. Install CARLA 0.9.14
+## Quickstart — no GPU, no CARLA, no AWS
 
-Download the CARLA 0.9.14 release from [GitHub](https://github.com/carla-simulator/carla/releases/tag/0.9.14).
-
-Install the Python API wheel that matches your Python version:
+Runs on any laptop (verified on an Apple-silicon Mac, Python 3.12):
 
 ```bash
-pip install <carla_release_dir>/PythonAPI/carla/dist/carla-0.9.14-*.whl
-```
-
-### 2. Install Python Dependencies
-
-```bash
+git clone https://github.com/Dayallenr/Autonomous-Driving.git PathFinder
+cd PathFinder
+python3.12 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+
+# Drive scored, seeded Episodes on the kinematic backend, with the real
+# YOLOv8m detector (CPU) in one arm — the same ablation pipeline that
+# produced the CARLA numbers above.
+python -m pathfinder.ablation --backend kinematic --episodes 3
 ```
 
-> **Note:** `torchvision` is required for the pretrained ResNet-18 backbone in the CIL model. If disk space is limited, the system falls back to a lightweight CNN backbone automatically.
+That writes `results/ablation/kinematic_report.json` and its generated
+write-up. The report labels itself **pipeline-only**: the kinematic backend
+verifies the pipeline end to end, and its scores are never quoted as driving
+quality — only the CARLA backend earns that.
 
-### 3. Verify the Perception Model
-
-`best_perception_model.pt` (already in the repo) is a YOLO model trained on KITTI with 8 classes:
-
-| ID | Class           |
-|----|-----------------|
-| 0  | car             |
-| 1  | van             |
-| 2  | truck           |
-| 3  | pedestrian      |
-| 4  | person_sitting  |
-| 5  | cyclist         |
-| 6  | tram            |
-| 7  | misc            |
-
----
-
-## Usage
-
-### Step 1 — Start CARLA
+Two more things that run anywhere:
 
 ```bash
-# Linux
-./CarlaUE4.sh
-
-# Windows
-CarlaUE4.exe
+python run_demo.py                  # the whole stack against local backends:
+                                    # queue → workers → telemetry → Parquet →
+                                    # datasets → training contract
+pip install -r requirements-dev.txt
+ruff check && pytest                # lint + the full test suite
 ```
 
-### Step 2 — Collect CIL Training Data
+The CARLA / GPU path (training the detector, driving live Episodes) is a
+different machine and a different setup; it is documented once, in
+[`docs/SETUP_WINDOWS.md`](docs/SETUP_WINDOWS.md). The KITTI pipeline and its
+figures are documented in [`docs/DATA.md`](docs/DATA.md).
 
-Drive the CARLA autopilot and log `(image, command, waypoints)` tuples:
+## What runs live, what runs local, what was never applied
 
-```bash
-python planning/collect_data.py --config config/config.yaml
-```
+This project claims exactly what it runs, phrased the same way everywhere:
 
-This populates `data/demonstrations/` with episode folders. Aim for at least 10–20 episodes (~2–5 hours of driving) for decent CIL performance.
+- **AWS SQS runs live** — [the queue code carries real visibility-timeout and DLQ semantics](pathfinder/cloud/queue.py "claim:prose")
+  and is tested against emulation; the live distributed run is scheduled
+  work (issues #18/#26).
+- **Kubernetes, with EKS-ready Terraform** — orchestration runs on
+  [kind](k8s/kind-config.yaml "claim:prose"), **not** "deployed on EKS". All
+  Terraform ([EKS](terraform/eks.tf "claim:prose"), ECR, SQS+DLQ, S3, KMS,
+  IRSA, GitHub OIDC) is validated in CI and has **never been applied to real
+  AWS**; nothing in this repo has ever provisioned a paid cloud resource.
+- **Kinesis, never applied to real AWS** —
+  [provisioned in Terraform and exercised against moto](terraform/kinesis.tf "claim:prose");
+  the default telemetry backend is local.
+- **SageMaker SDK in local mode** —
+  [the real SageMaker SDK, local Docker, zero spend](pathfinder/cloud/training.py "claim:prose").
+- **The behaviour-agent baseline is not project work** —
+  [`carla_builtin_behavior_agent` is CARLA's own behaviour agent](pathfinder/policies.py "claim:prose"):
+  its driving score is a reference upper bound only, and it has never been
+  run against a live server.
 
-### Step 3 — Train the CIL Model
+## Known limitations
 
-```bash
-python planning/train_cil.py --config config/config.yaml
-```
+Stated here because honesty is the feature, not the disclaimer:
 
-The best checkpoint is saved to `models/cil_model.pt`.
+- **The baseline controller is the bottleneck.** PurePursuit completes
+  [0.471](results/carla/backend_validation.json "claim:episode1.final_completion")
+  of a [351](results/carla/backend_validation.json "claim:episode1.route_length_m") m
+  Town05 route before `agent_blocked` —
+  [a driving-quality ceiling of the controller, not a backend defect](results/carla/backend_validation.json "claim:prose").
+  Any comparison against it is a low bar, and the comparison artifacts say so.
+- **Monocular range saturates in the near field.** Below the camera's
+  `min_measurable_range_m` the obstacle's ground contact leaves the frame and
+  the estimate over-reads — the unsafe direction. The floor is exposed on
+  `CameraGeometry` and [pinned by a test so it cannot regress into a claim that the near field works](tests/test_range_geometry.py "claim:prose").
+- **The detector in CARLA is out-of-domain.**
+  [It was trained on real KITTI imagery and driven on synthetic scenes](results/ablation/carla_report.json "claim:prose");
+  the ablation quantifies the cost rather than hiding it.
+- **[No learned policy has been trained yet](pathfinder/dagger.py "claim:prose").**
+  The DAgger loop, checkpointing, and scored comparison are proven CARLA-free
+  with untrained weights; training awaits a GPU sitting (issue #25).
+- **`person_sitting` is structurally unmeasurable** on this split (one
+  validation drive), as covered under the results table.
 
-### Step 4 — Run the Autonomous Agent
+## Reproducibility as a mechanism
 
-```bash
-python main.py --config config/config.yaml
-```
+- **Seeded Episodes.** An `EpisodeSpec` carries town, route, weather, and
+  seed; suites are generated from a base seed, so any run can be re-driven.
+- **Bit-reproducible CARLA.** Two runs of one seed diverge by
+  [0.0](results/carla/probe.json "claim:drive.max_divergence_m") m — but only
+  with fixed delta, synchronous mode, a seeded traffic manager **and**
+  [`world.set_pedestrians_seed()`](pathfinder/sim/carla_backend.py "claim:prose")
+  together; the last is easy to miss and without it identical seeds diverge.
+  Verified over full Episodes with traffic and pedestrians, not just the probe.
+- **Reports and write-ups land together.** Every run produces a report JSON
+  (the artifact) and a generated Markdown write-up rendered from it; golden
+  tests pin the generators.
+- **Claims are checked in CI.** Every number in this document and in
+  [CLAIMS.md](CLAIMS.md) is a link naming its artifact and field, verified by
+  `pathfinder/claims.py` on every push. Audit coverage yourself:
+  `python -m pathfinder.claims`.
 
-Options:
-- `--no-hud`     Disable the pygame visualisation window (faster, headless).
-- `--steps N`    Stop after N simulation ticks.
-- `--map TOWN`   Override the map (e.g. `Town01`, `Town03`).
+## Contributing / working conventions
 
----
-
-## Configuration
-
-All parameters are in `config/config.yaml`. Key sections:
-
-| Section         | Purpose                                          |
-|-----------------|--------------------------------------------------|
-| `carla`         | Server host/port, simulation FPS, map           |
-| `sensors`       | Camera resolution, LiDAR beams, GNSS/IMU noise  |
-| `perception`    | Model path, confidence/IoU thresholds, device   |
-| `localization`  | EKF process and measurement noise               |
-| `prediction`    | Tracking IoU threshold, horizon, track lifetime |
-| `planning`      | CIL model path, waypoint count, spacing         |
-| `control`       | PID gains, max throttle/brake/steer             |
-| `data_collection` | Episodes, steps, towns, target speed          |
-| `training`      | Batch size, LR, epochs, checkpoint dir          |
-
----
-
-## Module Details
-
-### Perception
-- Model: `best_perception_model.pt` — Ultralytics YOLO (8.4.14) trained on KITTI
-- Classes: car, van, truck, pedestrian, person_sitting, cyclist, tram, misc
-- Input: 800×600 BGR frame from CARLA RGB camera
-- Output: list of `Detection(class_id, class_name, confidence, bbox)`
-
-### Localization
-- Algorithm: 6-DOF Extended Kalman Filter
-- State: `[x, y, z, vx, vy, heading]`
-- Prediction: IMU accelerations + yaw rate
-- Update: GNSS lat/lon/alt (equirectangular projection, no external library)
-
-### Prediction
-- Algorithm: greedy IoU-based multi-object tracker
-- Prediction: constant-velocity kinematic model over a 2-second horizon
-- Input: detection list → `AgentPrediction(track_id, predicted_bboxes)`
-
-### Planning
-- Model: Conditional Imitation Learning (CIL / CILRS-style)
-- Backbone: ResNet-18 → 512-d feature vector
-- Branches: 4 independent MLP heads (one per command)
-- Output: 5 future (x, y) waypoints in vehicle-local frame
-
-### Control
-- Lateral PID: heading error between vehicle and next waypoint → steer
-- Longitudinal PID: speed error → throttle / brake
-- Speed management: automatic slowdown near pedestrians and vehicles
-
----
-
-## Workflow Diagram
-
-```
-[CARLA autopilot] ──► collect_data.py ──► data/demonstrations/
-                                                │
-                                                ▼
-                                          train_cil.py
-                                                │
-                                                ▼
-                                        models/cil_model.pt
-                                                │
-                              ┌─────────────────┘
-                              │
-[CARLA server] ──► main.py ──► agent.py ──► all modules ──► VehicleControl
-```
+Work is tracked as GitHub issues on this repo (conventions in
+[`docs/agents/`](docs/agents/)). Architecture decisions live in
+[`docs/adr/`](docs/adr/), the domain vocabulary in
+[`CONTEXT.md`](CONTEXT.md), and the claim-of-record in
+[`CLAIMS.md`](CLAIMS.md) — a new claim lands there before it lands anywhere
+else, this document included.
