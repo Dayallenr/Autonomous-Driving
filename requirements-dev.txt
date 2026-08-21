@@ -13,6 +13,9 @@ ruff>=0.6.0
 # the boto3-backed code paths without real credentials or LocalStack.
 moto[sqs,s3,kinesis]>=5.0.0
 
-# Terraform static analysis (Phase 7) — misconfiguration scanning without
-# ever touching real AWS.
-checkov>=3.2.0
+# Terraform static analysis (Phase 7) is checkov, but it is deliberately NOT
+# listed here: checkov pins boto3==1.35.49, which cannot resolve alongside
+# this project's boto3>=1.43.0 and broke `pip install -r requirements-dev.txt`
+# outright. CI runs checkov via bridgecrewio/checkov-action in its own
+# environment (see .github/workflows/ci.yml); to run it locally, keep it
+# isolated the same way: `pipx install checkov` (or its own venv).
