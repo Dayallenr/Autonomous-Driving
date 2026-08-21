@@ -23,6 +23,7 @@ from pathfinder.policies import (
     POLICY_NAMES,
     PURE_PURSUIT,
     CarlaBehaviorAgentPolicy,
+    CILStudentPolicy,
     build_policy,
 )
 from pathfinder.runner import ControlOutput, PurePursuitPolicy, run_episode
@@ -130,11 +131,14 @@ def test_the_default_planner_is_the_geometric_one():
     assert isinstance(build_policy(), PurePursuitPolicy)
 
 
-def test_every_registered_name_is_buildable():
-    """A name in the registry that cannot be built is a broken advert."""
+def test_every_registered_name_is_buildable(cil_checkpoint):
+    """A name in the registry that cannot be built is a broken advert. The
+    student's weights are its documented required argument, not a workaround."""
     simulator = FakeCarlaSimulator()
+    required = {CILStudentPolicy.NAME: {"weights": cil_checkpoint}}
     for name in POLICY_NAMES:
-        assert hasattr(build_policy(name, simulator=simulator), "plan")
+        policy = build_policy(name, simulator=simulator, **required.get(name, {}))
+        assert hasattr(policy, "plan")
 
 
 def test_an_unknown_policy_names_the_alternatives():
