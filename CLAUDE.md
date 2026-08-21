@@ -208,7 +208,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 1 KITTI data pipeline | **Done** — sequence-disjoint split, reproducible on Mac + Windows |
 | 2 Perception | **Done** — YOLOv8m trained, evaluated, `results/perception/yolov8m/report.json` |
 | — CARLA backend rewrite | **Validated against a live server** (2026-08-20) — `scripts/validate_carla_backend.py` passes every issue #5 criterion and writes `results/carla/backend_validation.json`. Three real bugs were found and fixed by running it; see "Established findings". The ego completes **47% of a 351 m Town05 route** before `agent_blocked`, which is a driving-quality ceiling of `PurePursuitPolicy` in CARLA, **not** a backend defect — no learned policy has driven this backend yet |
-| 3 CIL Policy + DAgger | **In progress** — the DAgger loop takes any `SimulatorBackend` and any expert `Policy` (#15; kinematic + PurePursuit stay the defaults, an injected simulator is caller-owned and not closed by the loop). The CLI exists (#20): `python -m pathfinder.dagger` checkpoints every iteration (weights + optimizer + report row + samples), auto-resumes a killed run losing at most one iteration (bit-identical to an uninterrupted run — randomness derives per-iteration from the seed), and lands report JSON + generated write-up together; `--smoke` is a minutes-long CPU loop check whose output self-labels as never-a-result against the documented `REAL_RUN_BAR` (carla + ImageNet init + ≥20k frames + ≥20 total epochs). Training itself not started — needs CARLA (#25, unblocked by #16/#21) |
+| 3 CIL Policy + DAgger | **In progress** — the DAgger loop takes any `SimulatorBackend` and any expert `Policy` (#15; kinematic + PurePursuit stay the defaults, an injected simulator is caller-owned and not closed by the loop). The CLI exists (#20): `python -m pathfinder.dagger` checkpoints every iteration (weights + optimizer + report row + samples), auto-resumes a killed run losing at most one iteration (bit-identical to an uninterrupted run — randomness derives per-iteration from the seed), and lands report JSON + generated write-up together; `--smoke` is a minutes-long CPU loop check whose output self-labels as never-a-result against the documented `REAL_RUN_BAR` (carla + ImageNet init + ≥20k frames + ≥20 total epochs). The scoring side is done (#21, 2026-08-20): the student is registered as `cil_student` (explicit weights path required, eval mode, pinned device, `model_version` = `cil_student@<sha256[:12]>` of the checkpoint bytes), and `python -m pathfinder.comparison --weights <ckpt>` scores floor / student / reference ceiling over the ablation's exact seeded suite, writing report JSON + write-up together; arms cannot claim a Policy or weights version they do not hold, and on non-CARLA backends the behaviour-agent column is recorded as skipped with the reason in the artifact. Mechanism proven CARLA-free with untrained weights. Training itself not started — needs CARLA (#25, unblocked by #16) |
 | 4 GT-vs-YOLO ablation | **Done** (2026-08-20) — real CARLA numbers: privileged 25.2 vs detector 8.86, perception costs 16.34 points; see "Established findings". `results/ablation/carla_report.{json,md}`; #1 and #10 closed with the numbers quoted |
 | 5 Distributed benchmark (SQS, telemetry, Parquet) | Queue/telemetry/warehouse code exists and is tested; needs real CARLA episodes and real AWS SQS |
 | 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
@@ -217,19 +217,23 @@ that a driven episode only ever surfaces commands its own route planned.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-313 tests pass on the Mac; `ruff check` clean.
+352 tests pass on the Mac; `ruff check` clean.
 
 ---
 
 ## Immediate next step
 
 **Phase 3 — CIL Policy + DAgger — is the open front.** The backend is
-validated (#5), the ablation is done with real numbers (#10), and the DAgger
-CLI + run artifacts landed (#20, closed 2026-08-20). Before the GPU sitting
-(#25) can happen, two tickets remain: #16 (behaviour-agent live Episode —
-mostly a user sitting) and #21 (CIL student as a registered Policy + the
-three-column comparison suite — fully agent-doable, the natural next agent
-ticket). Nothing has been trained yet.
+validated (#5), the ablation is done with real numbers (#10), the DAgger
+CLI + run artifacts landed (#20, closed 2026-08-20), and the scoring side
+landed (#21, 2026-08-20): `cil_student` in the registry plus the
+three-column comparison suite (`pathfinder/comparison.py`). Before the GPU
+sitting (#25) can happen, one ticket remains: #16 (behaviour-agent live
+Episode — mostly a user sitting). Nothing has been trained yet. Known
+limits of #21 to keep in view: the real three-column CARLA run has not
+happened (the kinematic run records the behaviour-agent column as skipped),
+and the phase-5 worker path (`EpisodeWorker`) cannot pass `weights=` yet, so
+`cil_student` is not yet drivable through the distributed benchmark.
 
 The ablation sharpened the baseline question: PurePursuit is now *measured*
 as the binding constraint on driving score (its own shortfall, 74.80 points,
@@ -274,6 +278,8 @@ pathfinder/
   rpc/        coordinator.py (servicer) · server.py (binds a port)
               client.py · generated stubs
   policies.py — build_policy(name) registry for the `Policy` protocol;
+              CILStudentPolicy (`cil_student`: loads a DAgger checkpoint by
+              explicit path, refuses without weights, version-stamped);
               ModularPolicy composes a Perception with an inner controller
               (unregistered — `pathfinder/ablation.py` composes it directly);
               CarlaBehaviorAgentPolicy wraps CARLA's own BehaviorAgent as the
@@ -282,6 +288,11 @@ pathfinder/
   orchestration.py · runner.py · benchmark_detector.py
   dagger.py — loop + CLI (per-iteration checkpoints, crash-resume, report)
   dagger_writeup.py — renders a dagger_run report into its Markdown write-up
+  comparison.py — three-column comparison (floor / cil_student / behaviour
+              agent) over the ablation's exact seeded suite; arm attribution
+              enforced; CLI mirrors ablation.py (partial checkpoints, report)
+  comparison_writeup.py — renders a policy_comparison report into Markdown
+              (boundary + not-project-work + weak-floor sentences, golden-tested)
   ablation.py — the GT-vs-Detector ablation: run_ablation() + CLI; provenance
               observed from telemetry, kinematic reports labelled pipeline-only
   ablation_writeup.py — renders a report JSON into its Markdown write-up

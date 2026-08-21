@@ -33,10 +33,12 @@ The interface used to be called ``Planner``; ADR-0002 records why it is not.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from collections.abc import Callable
 from dataclasses import replace
+from pathlib import Path
 
 from pathfinder.perception.base import Perception, perception_name
 from pathfinder.runner import ControlOutput, Policy, PurePursuitPolicy
@@ -49,6 +51,7 @@ __all__ = [
     "DEFAULT_POLICY",
     "POLICY_NAMES",
     "PURE_PURSUIT",
+    "CILStudentPolicy",
     "CarlaBehaviorAgentPolicy",
     "ModularPolicy",
     "build_policy",
@@ -218,10 +221,104 @@ class ModularPolicy:
         )
 
 
+class CILStudentPolicy:
+    """The trained CIL student behind the ``Policy`` protocol.
+
+    Args:
+        weights: Checkpoint to load — either the DAgger CLI's per-iteration
+            format (``{"model": state_dict, ...}``) or a bare state dict.
+            There is deliberately no default path: a student that silently
+            picks up whatever weights lie around produces scores attributable
+            to nothing.
+        device: Where inference runs. Pinned at construction, mirroring
+            :class:`~pathfinder.perception.detector.YoloDetector` — a device
+            that changes mid-benchmark changes the numbers.
+
+    The loaded model is put in eval mode and planning runs under inference
+    mode (both via :class:`~pathfinder.dagger.CILPolicy`, which this wraps).
+    ``model_version`` is derived from the checkpoint's bytes, so every result
+    stamped with it is attributable to exactly those weights — two different
+    checkpoints can never share a label the way two "cil_student" runs would.
+
+    Raises:
+        FileNotFoundError: If the checkpoint is missing. Eager and loud, like
+            the Detector: the runner turns mid-Episode exceptions into scored
+            failures, so a lazy check would spend a whole benchmark producing
+            zero-score Episodes instead of one error.
+        ValueError: If the checkpoint does not fit the control-output CIL
+            architecture (a waypoints-mode checkpoint, or something else
+            entirely).
+
+    torch is imported at construction, not at module import, for the same
+    reason CARLA is: the registry — and the orchestration layer that imports
+    it — must work in an environment without torch installed.
+    """
+
+    #: Registry name. The stem of every ``model_version`` this policy stamps.
+    NAME = "cil_student"
+
+    def __init__(self, weights: str | Path, *, device: str = "cpu") -> None:
+        path = Path(weights)
+        if not path.exists():
+            raise FileNotFoundError(
+                f"{self.NAME} weights not found at {path}. Train them with "
+                "python -m pathfinder.dagger, or point at an existing checkpoint."
+            )
+        import torch
+
+        from pathfinder.dagger import CILPolicy
+        from pathfinder.planning.cil_model import CILModel
+
+        payload = torch.load(path, map_location="cpu", weights_only=True)
+        state_dict = (
+            payload["model"] if isinstance(payload, dict) and "model" in payload else payload
+        )
+        model = CILModel(pretrained=False, output_mode="control")
+        try:
+            model.load_state_dict(state_dict)
+        except (RuntimeError, TypeError, AttributeError) as error:
+            raise ValueError(
+                f"{path} does not hold weights for the control-output CIL model "
+                f"({type(model).__name__} with output_mode='control'); a "
+                "waypoints-mode checkpoint cannot drive — the runner consumes "
+                f"controls. Original error: {error}"
+            ) from error
+
+        self._inner = CILPolicy(model, device=device)
+        self.weights_path = path
+        #: Carried into every result via the existing model-version label.
+        self.model_version = (
+            f"{self.NAME}@{hashlib.sha256(path.read_bytes()).hexdigest()[:12]}"
+        )
+        logger.info("%s loaded %s onto %s", self.model_version, path, device)
+
+    @property
+    def model(self):
+        return self._inner.model
+
+    @property
+    def device(self) -> str:
+        return self._inner.device
+
+    def plan(self, state: FrameState) -> ControlOutput:
+        return self._inner.plan(state)
+
+
 def _build_pure_pursuit(simulator, **kwargs) -> Policy:
     """The geometric controller reads only the ``FrameState`` it is handed, so
     the simulator is of no interest to it."""
     return PurePursuitPolicy(**kwargs)
+
+
+def _build_cil_student(simulator, *, weights=None, **kwargs) -> Policy:
+    """The student reads only the ``FrameState`` (pixels plus command), so the
+    simulator is of no interest to it — but weights are non-negotiable."""
+    if weights is None:
+        raise ValueError(
+            f"{CILStudentPolicy.NAME} refuses to run without trained weights; "
+            "pass build_policy(name, weights=...) pointing at a DAgger checkpoint"
+        )
+    return CILStudentPolicy(weights, **kwargs)
 
 
 def _build_carla_behavior_agent(simulator, **kwargs) -> Policy:
@@ -234,11 +331,13 @@ def _build_carla_behavior_agent(simulator, **kwargs) -> Policy:
 
 
 #: Selectable Policies. ``pure_pursuit`` is the project's geometric controller;
+#: ``cil_student`` is the trained CIL model (weights required, no default);
 #: ``carla_builtin_behavior_agent`` is CARLA's own behaviour agent, kept as a
 #: labelled reference rather than as project work. One table rather than a name
 #: list beside a matching if-cascade, so a new Policy is one edit.
 _BUILDERS: dict[str, Callable[..., Policy]] = {
     PURE_PURSUIT: _build_pure_pursuit,
+    CILStudentPolicy.NAME: _build_cil_student,
     CarlaBehaviorAgentPolicy.NAME: _build_carla_behavior_agent,
 }
 
