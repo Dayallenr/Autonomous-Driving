@@ -208,7 +208,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 1 KITTI data pipeline | **Done** — sequence-disjoint split, reproducible on Mac + Windows |
 | 2 Perception | **Done** — YOLOv8m trained, evaluated, `results/perception/yolov8m/report.json` |
 | — CARLA backend rewrite | **Validated against a live server** (2026-08-20) — `scripts/validate_carla_backend.py` passes every issue #5 criterion and writes `results/carla/backend_validation.json`. Three real bugs were found and fixed by running it; see "Established findings". The ego completes **47% of a 351 m Town05 route** before `agent_blocked`, which is a driving-quality ceiling of `PurePursuitPolicy` in CARLA, **not** a backend defect — no learned policy has driven this backend yet |
-| 3 CIL Policy + DAgger | Not started — needs CARLA |
+| 3 CIL Policy + DAgger | **In progress** — the DAgger loop takes any `SimulatorBackend` and any expert `Policy` (#15; kinematic + PurePursuit stay the defaults, an injected simulator is caller-owned and not closed by the loop). Training itself not started — needs CARLA |
 | 4 GT-vs-YOLO ablation | **Done** (2026-08-20) — real CARLA numbers: privileged 25.2 vs detector 8.86, perception costs 16.34 points; see "Established findings". `results/ablation/carla_report.{json,md}`; #1 and #10 closed with the numbers quoted |
 | 5 Distributed benchmark (SQS, telemetry, Parquet) | Queue/telemetry/warehouse code exists and is tested; needs real CARLA episodes and real AWS SQS |
 | 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
@@ -217,7 +217,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 9 README + demo | Not started; current README describes the old project |
 | 10 Claim-to-artifact mapping | Deferred by user request |
 
-286 tests pass, 1 skipped; `ruff check` clean.
+292 tests pass on the Mac; `ruff check` clean.
 
 ---
 
