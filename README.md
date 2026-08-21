@@ -198,11 +198,11 @@ different machine and a different setup; it is documented once, in
 [`docs/SETUP_WINDOWS.md`](docs/SETUP_WINDOWS.md). The KITTI pipeline and its
 figures are documented in [`docs/DATA.md`](docs/DATA.md).
 
-## What runs live, what runs local, what was never applied
+## What targets real AWS, what runs local, what was never applied
 
 This project claims exactly what it runs, phrased the same way everywhere:
 
-- **AWS SQS runs live** — [the queue code carries real visibility-timeout and DLQ semantics](pathfinder/cloud/queue.py "claim:prose")
+- **AWS SQS is the one live-AWS piece, and it has not run yet** — [the queue code carries real visibility-timeout and DLQ semantics](pathfinder/cloud/queue.py "claim:prose")
   and is tested against emulation; the live distributed run is scheduled
   work (issues #18/#26).
 - **Kubernetes, with EKS-ready Terraform** — orchestration runs on
@@ -246,14 +246,14 @@ Stated here because honesty is the feature, not the disclaimer:
 ## Reproducibility as a mechanism
 
 - **Seeded Episodes.** An `EpisodeSpec` carries town, route, weather, and
-  seed; suites are generated from a base seed, so any run can be re-driven.
+  seed; suites are generated from a base seed, so any Episode can be re-driven.
 - **Bit-reproducible CARLA.** Two runs of one seed diverge by
   [0.0](results/carla/probe.json "claim:drive.max_divergence_m") m — but only
   with fixed delta, synchronous mode, a seeded traffic manager **and**
   [`world.set_pedestrians_seed()`](pathfinder/sim/carla_backend.py "claim:prose")
   together; the last is easy to miss and without it identical seeds diverge.
   Verified over full Episodes with traffic and pedestrians, not just the probe.
-- **Reports and write-ups land together.** Every run produces a report JSON
+- **Reports and write-ups land together.** Every scored suite produces a report JSON
   (the artifact) and a generated Markdown write-up rendered from it; golden
   tests pin the generators.
 - **Claims are checked in CI.** Every number in this document and in
