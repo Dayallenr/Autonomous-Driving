@@ -50,6 +50,16 @@ variable "github_repository" {
   type        = string
 }
 
+variable "budget_notification_email" {
+  description = "Email that receives the $1 zero-spend budget alarm (see budget.tf). Required non-default, like github_repository, so the alarm can never be created pointing at nobody."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@[:space:]]+@[^@[:space:]]+$", var.budget_notification_email))
+    error_message = "budget_notification_email must be a plausible email address."
+  }
+}
+
 variable "sqs_visibility_timeout_seconds" {
   type    = number
   default = 30

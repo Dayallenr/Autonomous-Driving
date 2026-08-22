@@ -10,7 +10,20 @@ focused sitting, ending in `terraform destroy` the same session.
 EKS cluster (2× `t3.medium` nodes, on-demand), ECR repos for both images, a
 real SQS queue + DLQ, a real S3 bucket (7-day auto-expiry), a real Kinesis
 stream (on-demand mode), IRSA for worker pods (no static AWS keys in the
-cluster), and a GitHub OIDC deploy role for `.github/workflows/deploy.yml`.
+cluster), a GitHub OIDC deploy role for `.github/workflows/deploy.yml`, and
+the ground-rules $1 zero-spend budget alarm (`budget.tf`).
+
+## The one sanctioned subset: the SQS wizard (issue #18)
+
+`scripts/sqs_apply_wizard.sh` (run it from anywhere; it finds this
+directory) is the only supported way to apply *part* of this configuration:
+it creates the budget alarm first — and refuses to continue until the
+Budgets API confirms it — then targeted-applies exactly the episode queue,
+its DLQ, and the DLQ's redrive-allow policy. That footprint costs $0/month
+(SQS permanent free tier; a notification-only budget is free), and
+`tests/test_sqs_wizard.py` pins the wizard's target set so it can never
+grow to touch anything else. Everything below this line — the full cluster
+— remains validated-never-applied until the sitting described next.
 
 ## Rough cost for one session (apply → demo → destroy within ~2 hours)
 

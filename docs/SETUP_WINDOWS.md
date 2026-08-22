@@ -241,8 +241,11 @@ $RUN_ID = "localstack-rehearsal"
 $REPORT = "results/distributed/localstack_rehearsal.json"
 ```
 
-Real run — credentials from `aws configure` (issue #18's wizard, run once),
-queue URLs from that wizard's Terraform outputs:
+Real run — credentials from `aws configure` (issue #18's wizard —
+`bash scripts/sqs_apply_wizard.sh`, run once on any machine with Terraform;
+then `aws configure` on *this* machine with the same keys if the wizard ran
+elsewhere). The wizard ends by printing this exact block with the real URLs
+filled in:
 
 ```powershell
 $SQS_ENDPOINT = "https://sqs.us-east-1.amazonaws.com"
