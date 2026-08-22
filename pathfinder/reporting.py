@@ -32,6 +32,7 @@ __all__ = [
     "SCOPE_DRIVING_QUALITY",
     "SCOPE_PIPELINE_ONLY",
     "ReportArtifact",
+    "controller_label",
     "generated_from",
     "infraction_table",
     "print_cli_tail",
@@ -142,6 +143,13 @@ class ReportArtifact:
             render_writeup(report, source=str(self.output)), encoding="utf-8"
         )
         return writeup
+
+
+def controller_label(policy: object) -> str:
+    """What telemetry records as ``model_version``: the Policy's registry name
+    (``NAME``) when it declares one, so one controller's rows group under one
+    name across every entry point instead of splitting into two labels."""
+    return getattr(policy, "NAME", type(policy).__name__)
 
 
 def print_cli_tail(report: dict, output: Path, writeup: Path) -> None:

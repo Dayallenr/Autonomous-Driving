@@ -79,13 +79,6 @@ def _scope(backend_name: str) -> tuple[str, str]:
 _BACKEND_CAMERAS = {"kinematic": KINEMATIC_CAMERA, "carla": CARLA_CAMERA}
 
 
-def _controller_label(controller: Policy) -> str:
-    """What telemetry records as ``model_version``. Prefers the controller's
-    registry name (``NAME``) so ablation rows group with rows from every other
-    entry point instead of splitting one controller into two names."""
-    return getattr(controller, "NAME", type(controller).__name__)
-
-
 @dataclass(frozen=True)
 class _ArmResult:
     """One perception's pass over the suite, with observed provenance."""
@@ -118,7 +111,7 @@ def _run_arm(
             latencies.append(row["perception_latency_ms"])
 
         controller = controller_factory()
-        controller_name = controller_name or _controller_label(controller)
+        controller_name = controller_name or reporting.controller_label(controller)
         score = run_episode(
             simulator,
             spec,
