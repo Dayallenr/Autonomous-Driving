@@ -1,0 +1,90 @@
+[
+  {
+    "episode_id": "ep-0000",
+    "town": "Town01",
+    "weather": "ClearNoon",
+    "route_length_m": 400.0,
+    "seed": 1000,
+    "max_steps": 1500,
+    "delta_seconds": 0.05,
+    "traffic_density": 0.3,
+    "pedestrian_density": 0.15
+  },
+  {
+    "episode_id": "ep-0001",
+    "town": "Town03",
+    "weather": "ClearSunset",
+    "route_length_m": 400.0,
+    "seed": 1001,
+    "max_steps": 1500,
+    "delta_seconds": 0.05,
+    "traffic_density": 0.3,
+    "pedestrian_density": 0.15
+  },
+  {
+    "episode_id": "ep-0002",
+    "town": "Town05",
+    "weather": "HardRainNoon",
+    "route_length_m": 400.0,
+    "seed": 1002,
+    "max_steps": 1500,
+    "delta_seconds": 0.05,
+    "traffic_density": 0.3,
+    "pedestrian_density": 0.15
+  },
+  {
+    "episode_id": "ep-0003",
+    "town": "Town01",
+    "weather": "WetNoon",
+    "route_length_m": 400.0,
+    "seed": 1003,
+    "max_steps": 1500,
+    "delta_seconds": 0.05,
+    "traffic_density": 0.3,
+    "pedestrian_density": 0.15
+  },
+  {
+    "episode_id": "ep-0004",
+    "town": "Town03",
+    "weather": "ClearNoon",
+    "route_length_m": 400.0,
+    "seed": 1004,
+    "max_steps": 1500,
+    "delta_seconds": 0.05,
+    "traffic_density": 0.3,
+    "pedestrian_density": 0.15
+  },
+  {
+    "episode_id": "ep-0005",
+    "town": "Town05",
+    "weather": "ClearSunset",
+    "route_length_m": 400.0,
+    "seed": 1005,
+    "max_steps": 1500,
+    "delta_seconds": 0.05,
+    "traffic_density": 0.3,
+    "pedestrian_density": 0.15
+  },
+  {
+    "episode_id": "ep-0006",
+    "town": "Town01",
+    "weather": "HardRainNoon",
+    "route_length_m": 400.0,
+    "seed": 1006,
+    "max_steps": 1500,
+    "delta_seconds": 0.05,
+    "traffic_density": 0.3,
+    "pedestrian_density": 0.15
+  },
+  {
+    "episode_id": "ep-0007",
+    "town": "Town03",
+    "weather": "WetNoon",
+    "route_length_m": 400.0,
+    "seed": 1007,
+    "max_steps": 1500,
+    "delta_seconds": 0.05,
+    "traffic_density": 0.3,
+    "pedestrian_density": 0.15
+  }
+]

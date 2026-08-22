@@ -169,7 +169,12 @@ def render_writeup(report: dict, *, source: str) -> str:
         source: Path of the report artifact, as the write-up should cite it.
     """
     lines = [
-        f"# Distributed benchmark run — {report['backend']} backend",
+        # The run id is the run's own label — `localstack-rehearsal`,
+        # `sqs-live` — and #22 wants the artifact to carry it in its title,
+        # not just in the coordinator table, so a rehearsal can never read
+        # as a benchmark from the heading alone.
+        f"# Distributed benchmark run `{report['coordinator']['run_id']}` — "
+        f"{report['backend']} backend",
         "",
         generated_from(
             report, source=source, generator="pathfinder/distributed_writeup.py"

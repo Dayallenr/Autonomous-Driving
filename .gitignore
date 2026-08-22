@@ -74,3 +74,10 @@ terraform/*.tfplan
 terraform/tfplan
 terraform/*.tfvars
 !terraform/*.tfvars.example
+
+# Distributed-run working data (docs/SETUP_WINDOWS.md §9): per-frame JSONL
+# telemetry shards and the Parquet warehouse they drain into. The report
+# artifact in results/distributed/ records their counts; the data itself is
+# regenerable and stays untracked.
+/telemetry/
+/warehouse/
