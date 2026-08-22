@@ -116,11 +116,11 @@ never seen:
 
 <img src="results/perception/yolov8m/val_batch0_pred.jpg" alt="YOLOv8m predictions on held-out KITTI drives">
 
-A captured clip of a CARLA Episode will land here when it is recorded —
-one command, `python -m pathfinder.demo --backend carla`, replays a
-benchmarked Episode from the ablation suite, records it, and prints the
-embed block for this slot ([runbook §10](docs/SETUP_WINDOWS.md), tracked
-as issue #27). This README does not wait on it.
+This demo section ships figures-only, by decision: the one-command capture
+exists (`python -m pathfinder.demo --backend carla` replays a benchmarked
+Episode from the ablation suite, records it, and prints the embed block
+for this slot — [runbook §10](docs/SETUP_WINDOWS.md)) but was never
+recorded, and issue #27 closed unrun.
 
 ## Architecture
 
@@ -215,14 +215,22 @@ figures are documented in [`docs/DATA.md`](docs/DATA.md).
 
 This project claims exactly what it runs, phrased the same way everywhere:
 
-- **AWS SQS is the one live-AWS piece, and it has not run yet** — [the queue code carries real visibility-timeout and DLQ semantics](pathfinder/cloud/queue.py "claim:prose")
-  and is tested against emulation; the live distributed run is scheduled
-  work (issues #18/#26).
+- **AWS SQS is the one live-AWS piece** — the queue pair and a $1 budget
+  alarm are live on real AWS, targeted-applied by this repo's own Terraform
+  ([`scripts/sqs_apply_wizard.sh`](scripts/sqs_apply_wizard.sh "claim:prose"),
+  issue #18; permanent free tier, $0). [The queue code carries real
+  visibility-timeout and DLQ semantics](pathfinder/cloud/queue.py "claim:prose")
+  and is tested against emulation — but **no benchmark has ever run against
+  the live queues**: the live distributed run was skipped by decision
+  (issue #26, closed unrun), and the
+  [LocalStack rehearsal](results/distributed/localstack_rehearsal.json "claim:prose")
+  is the pipeline evidence.
 - **Kubernetes, with EKS-ready Terraform** — orchestration runs on
   [kind](k8s/kind-config.yaml "claim:prose"), **not** "deployed on EKS". All
-  Terraform ([EKS](terraform/eks.tf "claim:prose"), ECR, SQS+DLQ, S3, KMS,
+  other Terraform ([EKS](terraform/eks.tf "claim:prose"), ECR, S3, KMS,
   IRSA, GitHub OIDC) is validated in CI and has **never been applied to real
-  AWS**; nothing in this repo has ever provisioned a paid cloud resource.
+  AWS** — the SQS queue pair and budget alarm above are the one deliberate
+  exception; nothing in this repo has ever provisioned a paid cloud resource.
 - **Kinesis, never applied to real AWS** —
   [provisioned in Terraform and exercised against moto](terraform/kinesis.tf "claim:prose");
   the default telemetry backend is local.
