@@ -281,7 +281,10 @@ A kinematic Episode takes ~10 ms, so no by-hand kill can land mid-Episode;
 `--chaos-kill-after-frames` is the deterministic version. This worker takes
 one Episode off the queue, drives 200 frames, and dies the way a SIGKILL'd
 worker dies (exit code 70, no cleanup, no queue delete, no telemetry flush).
-Its Episode stays invisible for the 30 s visibility timeout, then redelivers:
+Its Episode stays invisible for the 30 s visibility timeout, then redelivers.
+Keep the frame count under the telemetry batch size (500) so the victim's
+partial telemetry dies with it — above that, its already-flushed rows would
+land in the warehouse alongside the survivor's re-run of the same Episode:
 
 ```powershell
 python scripts/run_worker.py --worker-id chaos-victim --coordinator localhost:50051 `

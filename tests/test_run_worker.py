@@ -73,9 +73,10 @@ def test_chaos_kill_fires_mid_episode_and_leaves_the_message_unacknowledged(monk
     class ChaosExit(BaseException):
         pass
 
-    monkeypatch.setattr(
-        run_worker_module, "_chaos_exit", lambda: (_ for _ in ()).throw(ChaosExit())
-    )
+    def raise_chaos_exit() -> None:
+        raise ChaosExit()
+
+    monkeypatch.setattr(run_worker_module, "_chaos_exit", raise_chaos_exit)
 
     async def body():
         service = CoordinatorService(episodes_total=1)

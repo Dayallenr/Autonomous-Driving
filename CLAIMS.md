@@ -117,7 +117,19 @@ CARLA 0.9.16 server on the Windows machine). Mechanism pinned CARLA-free by
 | The pre-registered training gate: reference [31.33](results/reference/carla_report.json "claim:floor_gate.reference_driving_score") over the recorded privileged-PurePursuit floor [25.2](results/reference/carla_report.json "claim:floor_gate.floor_driving_score") is a margin of [6.13](results/reference/carla_report.json "claim:floor_gate.margin") points, short of the required [10.0](results/reference/carla_report.json "claim:floor_gate.required_margin"). | machine-checked |
 | [The gate's verdict is **stop-and-reassess**](results/reference/carla_report.json "claim:prose"), under the rule pre-registered before the run; the margin is computed by the gate code from the ablation artifact, never hardcoded. The reassessment resolved on 2026-08-21: **Phase 3 training stopped by decision** (#11) — the DAgger/comparison machinery remains as pipeline work. | prose-audited |
 
-## 8. Boundaries and negative claims
+## 8. The distributed pipeline rehearsal (LocalStack, #22)
+
+Reproduce: `docs/SETUP_WINDOWS.md` §9 (LocalStack + two terminals, ~2
+minutes; kinematic workers, so any laptop). Mechanism pinned CARLA-free by
+`tests/test_distributed_e2e.py` and `tests/test_run_worker.py`; queue
+provisioning by `tests/test_provision_sqs.py`.
+
+| Claim | Kind |
+|---|---|
+| The runbook rehearsal completed [8](results/distributed/localstack_rehearsal.json "claim:coordinator.episodes_completed") of [8](results/distributed/localstack_rehearsal.json "claim:coordinator.episodes_total") episodes against LocalStack SQS: the chaos-killed worker's episode was redelivered by the visibility timeout ([1](results/distributed/localstack_rehearsal.json "claim:queue.redeliveries") redelivery, delivered [2](results/distributed/localstack_rehearsal.json "claim:queue.redelivered_episodes.0.receive_count") times) and completed by the surviving worker, with [0](results/distributed/localstack_rehearsal.json "claim:queue.dead_letters") messages dead-lettered and [0](results/distributed/localstack_rehearsal.json "claim:queue.approximate_depth") left on the queue. | machine-checked |
+| [The rehearsal artifact is pipeline evidence only](results/distributed/localstack_rehearsal.json "claim:prose") — kinematic backend, scope pipeline-only, run id `localstack-rehearsal`: it proves queue/coordinator/warehouse mechanics against a real SQS API, and its aggregate is never a driving-quality or benchmark number. No live AWS queue was used (that remains #18/#26). | prose-audited |
+
+## 9. Boundaries and negative claims
 
 These are the claims about what this project is *not*. They are all
 prose-audited: the checker verifies the evidence exists; review holds the

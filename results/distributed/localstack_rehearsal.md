@@ -1,4 +1,4 @@
-# Distributed benchmark run — kinematic backend
+# Distributed benchmark run `localstack-rehearsal` — kinematic backend
 
 Generated 2026-08-21T22:50:53+00:00 from [`results/distributed/localstack_rehearsal.json`](localstack_rehearsal.json), which records every number below along with the full episode specifications needed to re-run it. This file is rendered from that artifact by `pathfinder/distributed_writeup.py`; edit the generator, not this file.
 

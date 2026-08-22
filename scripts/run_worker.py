@@ -286,7 +286,11 @@ def main() -> None:
         help="Redelivery drill for the distributed-run runbook (#22/#26): after this "
         "many driven frames the worker dies abruptly (os._exit, exit code 70 — no "
         "queue delete, no telemetry flush), leaving its in-flight episode for the "
-        "visibility timeout to hand to a surviving worker. 0 disables.",
+        "visibility timeout to hand to a surviving worker. 0 disables. Keep the "
+        "value under the telemetry batch size (500): the victim's partial rows "
+        "then die with it, as a real crash's would; above that, already-flushed "
+        "rows from the dead attempt land in the warehouse alongside the "
+        "survivor's re-run.",
     )
     cloud_cli.add_telemetry_args(
         parser,
