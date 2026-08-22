@@ -202,11 +202,7 @@ SQS_TARGETS=(
   "aws_sqs_queue.episodes"
   "aws_sqs_queue_redrive_allow_policy.dead_letter"
 )
-SQS_TARGET_FLAGS=(
-  "-target=aws_sqs_queue.dead_letter"
-  "-target=aws_sqs_queue.episodes"
-  "-target=aws_sqs_queue_redrive_allow_policy.dead_letter"
-)
+SQS_TARGET_FLAGS=("${SQS_TARGETS[@]/#/-target=}")
 
 tf() { terraform -chdir="$TF_DIR" "$@"; }
 
@@ -214,6 +210,10 @@ fail() {
   printf '\n  %s✗ %s%s\n\n' "$RED" "$1" "$RESET"
   exit 1
 }
+
+# read_tfvar/write_tfvar deliberately mirror the library's _existing/write_env:
+# this wizard's persisted values live in terraform/terraform.tfvars (HCL
+# quoting), not in an .env file.
 
 # read_tfvar KEY — current value of KEY in terraform.tfvars, unquoted.
 read_tfvar() {
@@ -245,7 +245,7 @@ assert_plan_creates_only() {
   shift
   plan_json=$(mktemp)
   tf show -json "$planfile" > "$plan_json"
-  python3 - "$plan_json" "$@" <<'PY' || exit 1
+  if ! python3 - "$plan_json" "$@" <<'PY'
 import json, sys
 
 plan = json.load(open(sys.argv[1]))
@@ -260,6 +260,10 @@ if unexpected:
     sys.exit(f"plan would create resources outside the wizard's scope: {unexpected}")
 print(f"  plan creates only: {creates or 'nothing (already in place)'}")
 PY
+  then
+    rm -f "$plan_json"
+    fail "the saved plan reaches outside this wizard's permitted footprint — nothing was applied"
+  fi
   rm -f "$plan_json"
 }
 
@@ -352,17 +356,27 @@ pause
 
 # ── Stage 5: the budget alarm — before anything else ──────────────────────
 stage "Budget alarm (must exist before any apply)"
-if budget_exists; then
-  say "Budget alarm '$BUDGET_NAME' already exists — nothing to create."
-else
-  say "Planning the alarm (and only the alarm):"
-  tf plan -input=false "-target=$BUDGET_TARGET" -out=wizard-budget.tfplan >/dev/null \
-    || fail "terraform plan for the budget alarm failed"
-  assert_plan_creates_only "$TF_DIR/wizard-budget.tfplan" "$BUDGET_TARGET"
-  confirm "Create the \$1/month budget alarm emailing $BUDGET_EMAIL?" \
-    || fail "aborted — nothing was created"
-  tf apply wizard-budget.tfplan || fail "terraform apply of the budget alarm failed"
-fi
+say "Planning the alarm (and only the alarm):"
+# Always plan, even when the alarm already exists: a changed alarm email is
+# an in-place update this plan picks up — skipping on existence would leave
+# the new email unapplied and stage 7's clean-plan check failing.
+budget_rc=0
+tf plan -input=false -detailed-exitcode "-target=$BUDGET_TARGET" -out=wizard-budget.tfplan >/dev/null \
+  || budget_rc=$?
+case $budget_rc in
+  0)
+    say "Budget alarm already matches the configuration — nothing to change."
+    ;;
+  2)
+    assert_plan_creates_only "$TF_DIR/wizard-budget.tfplan" "$BUDGET_TARGET"
+    confirm "Create/update the \$1/month budget alarm emailing $BUDGET_EMAIL?" \
+      || fail "aborted — nothing was applied"
+    tf apply wizard-budget.tfplan || fail "terraform apply of the budget alarm failed"
+    ;;
+  *)
+    fail "terraform plan for the budget alarm errored — run 'terraform -chdir=terraform plan -target=$BUDGET_TARGET' to see why"
+    ;;
+esac
 say "Verifying against the AWS Budgets API..."
 tries=0
 until budget_exists; do
@@ -393,8 +407,11 @@ stage "Verify footprint and capture queue URLs"
 say "Re-planning the same targets — this should show no pending changes:"
 plan_rc=0
 tf plan -input=false -detailed-exitcode "${SQS_TARGET_FLAGS[@]}" "-target=$BUDGET_TARGET" >/dev/null 2>&1 || plan_rc=$?
-[[ $plan_rc -eq 0 ]] || fail "targeted re-plan still shows pending changes (exit $plan_rc) — inspect with: terraform -chdir=terraform plan"
-say "Clean: no changes pending for this workflow's resources."
+case $plan_rc in
+  0) say "Clean: no changes pending for this workflow's resources." ;;
+  2) fail "targeted re-plan still shows pending changes — inspect with: terraform -chdir=terraform plan" ;;
+  *) fail "targeted re-plan errored — run 'terraform -chdir=terraform plan' to see why" ;;
+esac
 ACTUAL_STATE=$(tf state list | sort)
 EXPECTED_STATE=$(printf '%s\n' "$BUDGET_TARGET" "${SQS_TARGETS[@]}" | sort)
 [[ "$ACTUAL_STATE" == "$EXPECTED_STATE" ]] \
@@ -430,7 +447,9 @@ say "done — its runbook consumes the URLs printed above. Destroying and"
 say "re-running this wizard later is also fine; it is idempotent."
 if confirm "Destroy the two queues now instead of keeping them?"; then
   tf destroy "${SQS_TARGET_FLAGS[@]}" || fail "targeted destroy failed"
-  say "Queues destroyed. The budget alarm stays as the account's safety net."
+  say "Queues destroyed — the URLs printed in stage 7 are now invalid; re-run"
+  say "this wizard to recreate the queues before the #26 sitting."
+  say "The budget alarm stays as the account's safety net."
   note "(Remove it too, if ever wanted: terraform -chdir=terraform destroy -target=$BUDGET_TARGET)"
 else
   say "Keeping the queues for #26. Record this on the issue."

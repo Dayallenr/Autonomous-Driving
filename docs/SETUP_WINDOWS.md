@@ -244,8 +244,9 @@ $REPORT = "results/distributed/localstack_rehearsal.json"
 Real run — credentials from `aws configure` (issue #18's wizard —
 `bash scripts/sqs_apply_wizard.sh`, run once on any machine with Terraform;
 then `aws configure` on *this* machine with the same keys if the wizard ran
-elsewhere). The wizard ends by printing this exact block with the real URLs
-filled in:
+elsewhere). The wizard prints this exact block with the real URLs filled in
+— keep the queues at its closing keep-or-destroy decision, since destroying
+them invalidates the printed URLs until the wizard is re-run:
 
 ```powershell
 $SQS_ENDPOINT = "https://sqs.us-east-1.amazonaws.com"
