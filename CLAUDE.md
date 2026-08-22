@@ -55,7 +55,11 @@ field path — and the claim checker (`pathfinder/claims.py`, run by
 4. **Checkpoint with the user** before: implementing cloud pieces, anything that
    costs money, and when a claim cannot be made honestly true.
 
-5. **Tool honesty in write-ups.** SQS runs live, so "AWS SQS" is fair. The
+5. **Tool honesty in write-ups.** The SQS queue pair + $1 alarm are live on
+   real AWS, applied by this repo's Terraform (#18) — so "AWS SQS" is fair —
+   but **no benchmark has ever run against them**: the live run was skipped
+   by decision (#26, 2026-08-21), so never quote a live-run number and always
+   name the LocalStack rehearsal as the pipeline evidence. The
    Kubernetes orchestration runs on kind, so say "Kubernetes, with EKS-ready
    Terraform" — not "deployed on EKS". SageMaker local mode is genuinely the
    SageMaker SDK, but say it runs in local mode. Kinesis is **not** cut:
@@ -240,11 +244,11 @@ that a driven episode only ever surfaces commands its own route planned.
 | — CARLA backend rewrite | **Validated against a live server** (2026-08-20) — `scripts/validate_carla_backend.py` passes every issue #5 criterion and writes `results/carla/backend_validation.json`. Three real bugs were found and fixed by running it; see "Established findings". The ego completes **47% of a 351 m Town05 route** before `agent_blocked`, which is a driving-quality ceiling of `PurePursuitPolicy` in CARLA, **not** a backend defect — no learned policy has driven this backend yet |
 | 3 CIL Policy + DAgger | **In progress** — the DAgger loop takes any `SimulatorBackend` and any expert `Policy` (#15; kinematic + PurePursuit stay the defaults, an injected simulator is caller-owned and not closed by the loop). The CLI exists (#20): `python -m pathfinder.dagger` checkpoints every iteration (weights + optimizer + report row + samples), auto-resumes a killed run losing at most one iteration (bit-identical to an uninterrupted run — randomness derives per-iteration from the seed), and lands report JSON + generated write-up together; `--smoke` is a minutes-long CPU loop check whose output self-labels as never-a-result against the documented `REAL_RUN_BAR` (carla + ImageNet init + ≥20k frames + ≥20 total epochs). The scoring side is done (#21, 2026-08-20): the student is registered as `cil_student` (explicit weights path required, eval mode, pinned device, `model_version` = `cil_student@<sha256[:12]>` of the checkpoint bytes), and `python -m pathfinder.comparison --weights <ckpt>` scores floor / student / reference ceiling over the ablation's exact seeded suite, writing report JSON + write-up together; arms cannot claim a Policy or weights version they do not hold, and on non-CARLA backends the behaviour-agent column is recorded as skipped with the reason in the artifact. Mechanism proven CARLA-free with untrained weights. The #16 reference baseline ran live (2026-08-21): ceiling 31.33, margin over the floor 6.13 < 10 → gate verdict `stop-and-reassess`, and the user **stopped Phase 3 training by decision** (2026-08-21; #11 and #25 closed). **Phase closed: machinery kept as pipeline work, nothing trained, nothing will be under the current plan** |
 | 4 GT-vs-YOLO ablation | **Done** (2026-08-20) — real CARLA numbers: privileged 25.2 vs detector 8.86, perception costs 16.34 points; see "Established findings". `results/ablation/carla_report.{json,md}`; #1 and #10 closed with the numbers quoted |
-| 5 Distributed benchmark (SQS, telemetry, Parquet) | **Report + chaos-kill e2e done** (#17, 2026-08-21) — the `distributed_run` report kind collects coordinator results over gRPC (new `GetRunResults` RPC), counts redeliveries from each result's `receive_count` (SQS's `ApproximateReceiveCount`, observed by the completing worker — works identically on local and SQS backends), and lands report JSON + write-up via `reporting.ReportArtifact`. `tests/test_distributed_e2e.py` kills a worker mid-Episode (BaseException past `run_episode`'s `except Exception` — a plain Exception would score-and-acknowledge, the wrong path), proves visibility-timeout redelivery to the survivor, Parquet row counts matching the report, DLQ empty, provenance on every row. **LocalStack rehearsal executed** (#22, 2026-08-21): the runbook is `docs/SETUP_WINDOWS.md` §9, executed end to end against LocalStack SQS with kinematic workers — chaos-killed worker (`run_worker.py --chaos-kill-after-frames`, os._exit mid-episode), `ep-0000` redelivered after the 30 s visibility timeout and completed by the survivor, DLQ empty, 8/8 with clean suite cross-check, `results/distributed/localstack_rehearsal.{json,md}`. `scripts/provision_sqs.py` mirrors `terraform/sqs.tf` onto LocalStack and refuses real AWS. **#18's wizard is prepped** (2026-08-21): `scripts/sqs_apply_wizard.sh` creates the $1 budget alarm (`terraform/budget.tf`), refuses to continue until the Budgets API confirms it, targeted-applies exactly the queue pair, verifies the state footprint, and prints the §9.1 config block; `tests/test_sqs_wizard.py` pins its target set. **#18 is done — the user ran the wizard** (2026-08-21, closed with evidence): `pathfinder-episodes` + `pathfinder-episodes-dlq` and the `pathfinder-zero-spend` $1 budget alarm are **live on real AWS** (us-east-1), verified from the Mac via read-only SQS/Budgets APIs — redrive to the DLQ at maxReceiveCount 3, SQS-managed SSE, 30 s visibility timeout, local Terraform state holding exactly the four targeted resources. Queues kept. Still needs the live run (#26, #12) |
+| 5 Distributed benchmark (SQS, telemetry, Parquet) | **Report + chaos-kill e2e done** (#17, 2026-08-21) — the `distributed_run` report kind collects coordinator results over gRPC (new `GetRunResults` RPC), counts redeliveries from each result's `receive_count` (SQS's `ApproximateReceiveCount`, observed by the completing worker — works identically on local and SQS backends), and lands report JSON + write-up via `reporting.ReportArtifact`. `tests/test_distributed_e2e.py` kills a worker mid-Episode (BaseException past `run_episode`'s `except Exception` — a plain Exception would score-and-acknowledge, the wrong path), proves visibility-timeout redelivery to the survivor, Parquet row counts matching the report, DLQ empty, provenance on every row. **LocalStack rehearsal executed** (#22, 2026-08-21): the runbook is `docs/SETUP_WINDOWS.md` §9, executed end to end against LocalStack SQS with kinematic workers — chaos-killed worker (`run_worker.py --chaos-kill-after-frames`, os._exit mid-episode), `ep-0000` redelivered after the 30 s visibility timeout and completed by the survivor, DLQ empty, 8/8 with clean suite cross-check, `results/distributed/localstack_rehearsal.{json,md}`. `scripts/provision_sqs.py` mirrors `terraform/sqs.tf` onto LocalStack and refuses real AWS. **#18's wizard is prepped** (2026-08-21): `scripts/sqs_apply_wizard.sh` creates the $1 budget alarm (`terraform/budget.tf`), refuses to continue until the Budgets API confirms it, targeted-applies exactly the queue pair, verifies the state footprint, and prints the §9.1 config block; `tests/test_sqs_wizard.py` pins its target set. **#18 is done — the user ran the wizard** (2026-08-21, closed with evidence): `pathfinder-episodes` + `pathfinder-episodes-dlq` and the `pathfinder-zero-spend` $1 budget alarm are **live on real AWS** (us-east-1), verified from the Mac via read-only SQS/Budgets APIs — redrive to the DLQ at maxReceiveCount 3, SQS-managed SSE, 30 s visibility timeout, local Terraform state holding exactly the four targeted resources. Queues kept. **The live run was skipped by the user's decision (2026-08-21): #26 and #12 closed unrun.** The LocalStack rehearsal stands as the phase's pipeline evidence; the live queues stay provisioned with no benchmark ever run against them, and README/CLAIMS.md say exactly that |
 | 6 gRPC service | **Done** — `pathfinder/rpc/server.py` binds a port; latency measured over loopback at p50 0.26 ms (RegisterWorker/Heartbeat/SubmitResult) and 0.82 ms (GetRunStatus), 500 calls each, `results/rpc/latency_report.json` |
 | 7 Terraform / LocalStack / kind | **Written, never applied** — `terraform/` passes `fmt -check`, `init -backend=false`, `validate`, and `checkov` in CI; provisions EKS, ECR, SQS+DLQ, S3, **Kinesis**, KMS, IRSA, GitHub OIDC. `k8s/` carries kind manifests and an `eks/` overlay. Nothing has been applied to real AWS |
 | 8 CI/CD | **Done** — `.github/workflows/ci.yml` (ruff, pytest, hadolint, Docker build, trivy, compose validate, terraform validate + checkov) and `deploy.yml` (manual `workflow_dispatch` only) |
-| 9 README + demo | **README done** (#23, 2026-08-21) — findings-first rewrite, opted in to the claim checker (55 machine-checked + 16 prose-audited claims at #23's close; later work adds rows, so `python -m pathfinder.claims` has the live counts), tool-honesty boundaries in the established phrasing, zero-GPU quickstart executed end-to-end on the Mac in a fresh Python 3.12 venv. The demo clip slot remains open (#27) and the README does not wait on it. **#27's agent share is done** (2026-08-21): `python -m pathfinder.demo --backend carla` replays ablation `ep-0000` under the privileged PurePursuit arm, records chase-cam MP4 + README GIF, and lands a `demo_capture` report whose generated write-up *is* the README paste block (numbers cited in the checker convention, media as prose claims); kinematic runs self-label pipeline-only and print no paste block. Runbook is `docs/SETUP_WINDOWS.md` §10 — the user records during any CARLA sitting and pastes the printed block |
+| 9 README + demo | **README done** (#23, 2026-08-21) — findings-first rewrite, opted in to the claim checker (55 machine-checked + 16 prose-audited claims at #23's close; later work adds rows, so `python -m pathfinder.claims` has the live counts), tool-honesty boundaries in the established phrasing, zero-GPU quickstart executed end-to-end on the Mac in a fresh Python 3.12 venv. The demo clip slot remains open (#27) and the README does not wait on it. **#27's agent share is done** (2026-08-21): `python -m pathfinder.demo --backend carla` replays ablation `ep-0000` under the privileged PurePursuit arm, records chase-cam MP4 + README GIF, and lands a `demo_capture` report whose generated write-up *is* the README paste block (numbers cited in the checker convention, media as prose claims); kinematic runs self-label pipeline-only and print no paste block. Runbook is `docs/SETUP_WINDOWS.md` §10. **The clip was skipped by the user's decision (2026-08-21): #27 and #13 closed.** The README demo section ships figures-only permanently and says so; the capture machinery remains in the repo unrun |
 | 10 Claim-to-artifact mapping | **Done** (#14 closed 2026-08-21) — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table landed (#24, 2026-08-21): root `CLAIMS.md` is the claim-of-record — every established finding cited machine-checked, the boundary claims prose-audited. The README opted in with #23 (2026-08-21). Coverage at close: 134 machine-checked + 38 prose-audited across the three documents, 0 failures (`python -m pathfinder.claims` for the live counts). Future phases add rows in the same change that lands their artifacts — a claim that drifts from its artifact is a failing build |
 
 470 tests pass on the Mac; `ruff check` clean.
@@ -263,20 +267,31 @@ and that framing (gates that actually fire) is part of the project's story.
 Do not propose restarting training without new evidence that would move
 the gate.
 
-**The open front is Phase 5 — making the distributed benchmark real:**
-#22 (LocalStack rehearsal) is done — the runbook is `docs/SETUP_WINDOWS.md`
-§9 and the rehearsal artifact is checked in. #18 is closed (2026-08-21):
-the user ran the wizard — the queue pair and the $1 alarm are live on real
-AWS (us-east-1), state footprint verified, queues kept. Next is #26 (the
-live run, which replays §9 with only the config block changed — the wizard
-printed that block during the user's run). #27 (demo clip) now only needs
-the user's CARLA sitting — the capture command and runbook §10 are done
-(2026-08-21) — so #26 and #27 batch into one Windows evening; the
-phase tickets #12/#13 remain open (#14 closed 2026-08-21 — Phase 10 is
-done, 134 machine-checked + 38 prose-audited claims, 0 failures). With
-training stopped, the real
-distributed run scores `pure_pursuit` on kinematic workers plus the CARLA
-worker — the honest labelling machinery for that already exists.
+**All phase tickets are closed (2026-08-21) — the project is complete
+under the current plan.** The user decided to skip the two remaining
+user-gated items rather than run them: the live distributed run (#26/#12,
+closed unrun — the LocalStack rehearsal is the pipeline evidence, the live
+queues stay provisioned-but-never-used) and the README demo clip (#27/#13,
+closed — the demo section ships figures-only permanently). Phase 10 closed
+the same day (#14: 134 machine-checked + 38 prose-audited claims, 0
+failures). The tool-honesty language in README, CLAIMS.md, and this file
+was updated in the same change, so every document states the skips
+explicitly rather than leaving "scheduled work" standing.
+
+Two things remain, both user-triggered:
+
+- **The live queues** (`pathfinder-episodes` + DLQ + the $1 alarm, us-east-1)
+  are kept — $0 on the permanent free tier. If the user says "destroy the
+  queues", run `terraform destroy` targeted at exactly the four state
+  entries and update the tool-honesty language to past tense in the same
+  change. Do not destroy without their explicit word.
+- **Resume bullets** are the one deferred work item (ground rule 6). The
+  substrate is ready: every bullet gets assembled from pre-verified rows in
+  `CLAIMS.md`. Write them only when the user asks.
+
+If the user later reverses a skip, the machinery is all still there:
+runbook §9 + the wizard-printed config block for the live run, runbook §10
+for the clip. Reopen the tickets rather than creating new ones.
 
 Environment note: the CARLA 0.9.16 wheels are **cp312 only**, so `.venv` is
 Python 3.12. `torch`/`torchvision`/`ultralytics` are deliberately *not* in it —
