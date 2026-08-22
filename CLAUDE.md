@@ -247,7 +247,7 @@ that a driven episode only ever surfaces commands its own route planned.
 | 9 README + demo | **README done** (#23, 2026-08-21) — findings-first rewrite, opted in to the claim checker (55 machine-checked + 16 prose-audited claims verified in CI), tool-honesty boundaries in the established phrasing, zero-GPU quickstart executed end-to-end on the Mac in a fresh Python 3.12 venv. The demo clip slot remains open (#27) and the README does not wait on it. **#27's agent share is done** (2026-08-21): `python -m pathfinder.demo --backend carla` replays ablation `ep-0000` under the privileged PurePursuit arm, records chase-cam MP4 + README GIF, and lands a `demo_capture` report whose generated write-up *is* the README paste block (numbers cited in the checker convention, media as prose claims); kinematic runs self-label pipeline-only and print no paste block. Runbook is `docs/SETUP_WINDOWS.md` §10 — the user records during any CARLA sitting and pastes the printed block |
 | 10 Claim-to-artifact mapping | **In progress** — the claim checker + citation convention landed (#19): `docs/CLAIMS.md` defines the convention (Markdown link → artifact + JSON field path; `claim:prose` for non-numeric claims), `pathfinder/claims.py` enforces it via `tests/test_claims_checker.py`, and the convention page itself opts in so the worked examples are CI-verified. The claims table landed (#24, 2026-08-21): root `CLAIMS.md` is the claim-of-record — every established finding cited machine-checked, the boundary claims prose-audited, all passing in CI (`python -m pathfinder.claims` for the live counts). The README opted in with #23 (2026-08-21) |
 
-455 tests pass on the Mac; `ruff check` clean.
+470 tests pass on the Mac; `ruff check` clean.
 
 ---
 
@@ -350,10 +350,12 @@ pathfinder/
   demo.py — the #27 demo capture: replays one Episode of the ablation's exact
               suite under its privileged PurePursuit arm, records MP4 + README
               GIF (chase camera on CARLA, the 200x88 render upscaled on
-              kinematic), and lands a demo_capture report whose write-up is
-              the README paste block with checker-convention citations; only
-              a CARLA capture gets a paste block, kinematic self-labels
-              pipeline-only
+              kinematic), and lands a demo_capture report; only a CARLA
+              capture gets a paste block, kinematic self-labels pipeline-only
+  demo_writeup.py — renders a demo_capture report into its write-up: the
+              README paste block (embed + caption, checker-convention
+              citations, media as prose claims, forward-slashed paths even
+              from PowerShell)
   reporting.py — the one home (#29) for what every report kind above shares:
               the scope rule (only CARLA earns driving-quality), ReportArtifact
               (partial checkpoints + report/write-up landing, utf-8 explicit),

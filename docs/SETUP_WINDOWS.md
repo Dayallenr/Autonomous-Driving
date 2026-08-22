@@ -365,8 +365,8 @@ untracked.)
 ## 10. Capture the README demo clip (issue #27)
 
 One command during any CARLA sitting. It replays `ep-0000` from the ablation's
-exact suite (Town01, ClearNoon, seed 1000 — the privileged PurePursuit arm
-that scored 42.91 there), records it through a 960x540 chase camera, and lands
+exact suite (Town01, ClearNoon, seed 1000) under the ablation's privileged
+PurePursuit arm, records it through a 960x540 chase camera, and lands
 `results/demo/carla_demo.{json,md,mp4,gif}` — report, README paste block, full
 clip, and the 16 s GIF the README embeds.
 

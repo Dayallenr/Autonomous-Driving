@@ -13,7 +13,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pathfinder.demo import DemoRecorder, capture_demo, render_snippet
+from pathfinder.demo import DemoRecorder, capture_demo
+from pathfinder.demo_writeup import extract_paste_block, render_writeup
 from pathfinder.sim import EpisodeSpec, KinematicSimulator
 
 
@@ -149,7 +150,7 @@ def _carla_shaped(report: dict) -> dict:
 class TestRenderSnippet:
     def test_carla_snippet_carries_a_paste_block_with_cited_caption(self, captured):
         report, _ = captured
-        snippet = render_snippet(
+        snippet = render_writeup(
             _carla_shaped(report), source="results/demo/carla_demo.json"
         )
 
@@ -169,10 +170,25 @@ class TestRenderSnippet:
 
     def test_pipeline_only_snippet_has_no_embed_and_says_so(self, captured):
         report, _ = captured
-        snippet = render_snippet(report, source="results/demo/kinematic_demo.json")
+        snippet = render_writeup(report, source="results/demo/kinematic_demo.json")
 
         assert "never the README demo" in snippet
         assert "<img" not in snippet
+        assert extract_paste_block(snippet) is None
+
+    def test_windows_source_path_still_yields_forward_slash_citations(self, captured):
+        """The capture runs in PowerShell, where the default output path
+        stringifies with backslashes. GitHub cannot resolve those and the
+        claim checker on Linux CI cannot find the artifacts, so the paste
+        block must come out forward-slashed regardless of platform."""
+        report, _ = captured
+        snippet = render_writeup(
+            _carla_shaped(report), source="results\\demo\\carla_demo.json"
+        )
+
+        assert "\\" not in snippet
+        assert '<img src="results/demo/' in snippet
+        assert '(results/demo/carla_demo.json "claim:score.driving_score")' in snippet
 
     def test_paste_block_citations_pass_the_claim_checker(self, captured, tmp_path):
         """The end the snippet exists for: pasted into an opted-in document at
@@ -192,9 +208,9 @@ class TestRenderSnippet:
         for key in ("video", "gif"):
             shutil.copy(media_dir / report["media"][key], demo_dir)
 
-        snippet = render_snippet(_carla_shaped(report), source=source)
-        # Everything between the fence markers is the block the user pastes.
-        fenced = snippet.split("```markdown\n")[1].split("```")[0]
+        snippet = render_writeup(_carla_shaped(report), source=source)
+        fenced = extract_paste_block(snippet)
+        assert fenced is not None
         readme = root / "README.md"
         readme.write_text("<!-- claims: checked -->\n\n" + fenced, encoding="utf-8")
 
@@ -240,3 +256,25 @@ class TestCli:
         assert output.with_suffix(".gif").is_file()
         assert not output.with_suffix(".partial.jsonl").exists()
         assert "pipeline-only" in capsys.readouterr().out
+
+    def test_writeup_regenerates_from_the_report_alone(self, tmp_path, capsys):
+        """Fixing snippet wording must never require re-driving a ten-minute
+        CARLA Episode — the write-up regenerates from the JSON, like every
+        other report kind's."""
+        from pathfinder.demo import main
+        from pathfinder.demo_writeup import main as writeup_main
+
+        output = tmp_path / "kinematic_demo.json"
+        main(
+            [
+                "--backend", "kinematic",
+                "--route-length-m", "80",
+                "--max-steps", "30",
+                "--output", str(output),
+            ]
+        )
+        original = output.with_suffix(".md").read_text(encoding="utf-8")
+        output.with_suffix(".md").unlink()
+
+        assert writeup_main([str(output)]) == 0
+        assert output.with_suffix(".md").read_text(encoding="utf-8") == original

@@ -31,12 +31,13 @@ from pathlib import Path
 import numpy as np
 
 from pathfinder import reporting
+from pathfinder.demo_writeup import extract_paste_block, render_writeup
 from pathfinder.perception.privileged import PrivilegedPerception
 from pathfinder.policies import ModularPolicy
 from pathfinder.runner import ControlOutput, Policy, PurePursuitPolicy, run_episode
 from pathfinder.sim.base import EpisodeSpec, FrameState, SimulatorBackend
 
-__all__ = ["ChaseCamera", "DemoRecorder", "capture_demo", "render_snippet", "suite_episode"]
+__all__ = ["ChaseCamera", "DemoRecorder", "capture_demo", "suite_episode"]
 
 #: What a frame source yields: the frame to record for the current state, or
 #: None when no frame is available this tick (a sensor queue can lag a step).
@@ -86,7 +87,7 @@ class DemoRecorder:
         self._scale = scale
         self._writer = None
         self._frames = 0
-        self._gif_frames: list = []
+        self._gif_frames: list[object] = []  # PIL Images; PIL imports lazily
         self._size: tuple[int, int] | None = None
 
     def add(self, frame: np.ndarray) -> None:
@@ -228,7 +229,7 @@ def capture_demo(
     """
     source = frame_source if frame_source is not None else lambda state: state.image
     controller = controller_factory()
-    model_version = getattr(controller, "NAME", type(controller).__name__)
+    model_version = reporting.controller_label(controller)
     policy = _RecordingPolicy(
         ModularPolicy(PrivilegedPerception(), controller), recorder, source
     )
@@ -359,98 +360,6 @@ class ChaseCamera:
             self._camera = None
 
 
-def _cite(value: object, artifact: str, field_path: str) -> str:
-    """One machine-checked citation in the ``docs/CLAIMS.md`` convention.
-
-    The quote is ``str(value)`` of the artifact's own (already rounded) JSON
-    value, so the checker's decimal-count comparison matches by construction —
-    quoting a re-rounded number here would be the drift the checker exists to
-    catch."""
-    return f'[{value}]({artifact} "claim:{field_path}")'
-
-
-def render_snippet(report: dict, *, source: str) -> str:
-    """Render a ``demo_capture`` report's write-up: the README paste block.
-
-    For a CARLA capture the write-up carries a fenced Markdown block to paste
-    into the README verbatim — the embed plus a caption naming the Policy, the
-    seed, and the Episode's own score, every number cited against ``source``
-    and the media files cited as prose claims. The fence keeps the citations
-    inert in this file (their paths are README-relative, not write-up
-    relative) while the claim checker enforces them the moment they land in
-    the README.
-
-    A pipeline-only capture gets no paste block at all: a kinematic clip in
-    the README would present a physics-free render as the demo, so the
-    write-up says exactly that instead.
-    """
-    directory = Path(source).parent
-    episode, score, media, policy = (
-        report["episode"], report["score"], report["media"], report["policy"],
-    )
-    lines = [
-        "# Demo capture",
-        "",
-        reporting.generated_from(report, source=source, generator="pathfinder.demo"),
-        "",
-        reporting.scope_banner(report),
-        "",
-        f"- Episode: `{episode['episode_id']}` — {episode['town']}, "
-        f"{episode['weather']}, seed {episode['seed']}",
-        f"- Policy: `{policy['model_version']}` with {policy['perception']} perception",
-        f"- Driving score {score['driving_score']}, route completion "
-        f"{score['route_completion']} of {episode['route_length_m']} m, "
-        f"{score['frames']} frames ({score['termination_reason']})",
-        f"- Media: `{media['video']}` ({media['frames']} frames at "
-        f"{media['fps']:g} fps), `{media['gif']}` (first {media['gif_covers_seconds']} s)",
-        "",
-    ]
-
-    if report["scope"] != reporting.SCOPE_DRIVING_QUALITY:
-        lines += [
-            "This capture is **never the README demo**: only a CARLA Episode may "
-            "be embedded there, and this one verified the capture pipeline on the "
-            f"`{report['backend']}` backend. Record the real clip with "
-            "`python -m pathfinder.demo --backend carla` (docs/SETUP_WINDOWS.md §10).",
-            "",
-        ]
-        return "\n".join(lines)
-
-    gif = str(directory / media["gif"])
-    video = str(directory / media["video"])
-    json_path = source
-    lines += [
-        "Paste the block below into the README's demo slot (the issue #27 "
-        "placeholder), replacing it. Paths are README-relative, so the report "
-        "and media must live where this capture wrote them, committed to the "
-        "repo. The claim checker then verifies every number and the media "
-        "files' existence in CI.",
-        "",
-        "```markdown",
-        f'<img src="{gif}" alt="{policy["model_version"]} driving a seeded CARLA '
-        f'Episode in {episode["town"]}">',
-        "",
-        f"*A seeded CARLA Episode — {episode['town']}, {episode['weather']}, seed "
-        f"{_cite(episode['seed'], json_path, 'episode.seed')} — driven by this "
-        f"project's `{policy['model_version']}` with {policy['perception']} "
-        "perception (the ablation's baseline arm): driving score "
-        f"{_cite(score['driving_score'], json_path, 'score.driving_score')}, "
-        "completing "
-        f"{_cite(score['route_completion'], json_path, 'score.route_completion')} "
-        "of its "
-        f"{_cite(episode['route_length_m'], json_path, 'episode.route_length_m')} m "
-        "route. The GIF shows the first "
-        f"{_cite(media['gif_covers_seconds'], json_path, 'media.gif_covers_seconds')} s "
-        f"in real time; [the full clip]({video} \"claim:prose\") and "
-        f"[the capture report]({json_path} \"claim:prose\") sit beside "
-        f"[it]({gif} \"claim:prose\"). Recorded by `python -m pathfinder.demo "
-        "--backend carla`.*",
-        "```",
-        "",
-    ]
-    return "\n".join(lines)
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -539,7 +448,7 @@ def main(argv: list[str] | None = None) -> int:
             if chase is not None:
                 chase.close()
 
-    writeup = artifact.finish(report, render_snippet)
+    writeup = artifact.finish(report, render_writeup)
 
     score = report["score"]
     print(
@@ -547,8 +456,8 @@ def main(argv: list[str] | None = None) -> int:
         f"driving score {score['driving_score']}, route completion "
         f"{score['route_completion']}, {report['media']['frames']} frames recorded"
     )
-    if report["scope"] == reporting.SCOPE_DRIVING_QUALITY:
-        block = writeup.read_text(encoding="utf-8").split("```markdown\n")[1].split("```")[0]
+    block = extract_paste_block(writeup.read_text(encoding="utf-8"))
+    if block is not None:
         print("\nPaste into the README demo slot (replacing the issue #27 placeholder):\n")
         print(block)
     reporting.print_cli_tail(report, output, writeup)
