@@ -116,8 +116,11 @@ never seen:
 
 <img src="results/perception/yolov8m/val_batch0_pred.jpg" alt="YOLOv8m predictions on held-out KITTI drives">
 
-A captured clip of a CARLA Episode will land here when it is recorded
-(tracked as issue #27); this README does not wait on it.
+A captured clip of a CARLA Episode will land here when it is recorded —
+one command, `python -m pathfinder.demo --backend carla`, replays a
+benchmarked Episode from the ablation suite, records it, and prints the
+embed block for this slot ([runbook §10](docs/SETUP_WINDOWS.md), tracked
+as issue #27). This README does not wait on it.
 
 ## Architecture
 

@@ -362,6 +362,41 @@ git push
 #12/#26 instead; `./telemetry` and `./warehouse` are working data and stay
 untracked.)
 
+## 10. Capture the README demo clip (issue #27)
+
+One command during any CARLA sitting. It replays `ep-0000` from the ablation's
+exact suite (Town01, ClearNoon, seed 1000 — the privileged PurePursuit arm
+that scored 42.91 there), records it through a 960x540 chase camera, and lands
+`results/demo/carla_demo.{json,md,mp4,gif}` — report, README paste block, full
+clip, and the 16 s GIF the README embeds.
+
+With CarlaUE4.exe running (same server setup as step 7), from the repo root:
+
+```powershell
+python -m pathfinder.demo --backend carla
+```
+
+Takes about ten minutes (a 1,500-step Episode plus map load). The command
+prints the README paste block when it finishes; it is also saved as
+`results/demo/carla_demo.md`. Then:
+
+1. Open `README.md`, find the issue #27 placeholder paragraph ("A captured
+   clip of a CARLA Episode will land here…"), and replace it with the printed
+   block.
+2. Verify and commit — the claim checker confirms the caption's numbers match
+   the capture report and that the media files exist:
+
+```powershell
+python -m pytest tests/test_claims_checker.py -q
+git add README.md results/demo
+git commit -m "Capture the CARLA demo clip and embed it in the README (#27)"
+git push
+```
+
+A `--backend kinematic` run of the same command is the Mac-side smoke: it
+exercises the whole capture pipeline but labels itself pipeline-only and
+prints no paste block — never embed one of those.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
